@@ -2,10 +2,13 @@
 [![mloda](https://img.shields.io/badge/built%20with-mloda-blue.svg)](https://github.com/mloda-ai/mloda)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Tests](https://github.com/mloda-ai/mloda-plugin-template/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/mloda-ai/mloda-plugin-template/actions/workflows/test.yml?query=branch%3Amain)
+[![Prototype Fund](https://img.shields.io/badge/Prototype%20Fund-Jahrgang%2002-f1c40f.svg)](https://prototypefund.de)
 
-# mloda-plugin-template
+# mloda-plugin-govdata
 
 > **A GitHub template for creating standalone mloda plugins.** Part of the [mloda](https://github.com/mloda-ai/mloda) ecosystem for open data access. Visit [mloda.ai](https://mloda.ai) for an overview and business context, the [GitHub repository](https://github.com/mloda-ai/mloda) for technical context, or the [documentation](https://mloda-ai.github.io/mloda/) for detailed guides.
+
+> **Funding:** Developed as part of the [Prototype Fund](https://prototypefund.de) (Round 2 / Jahrgang 02), funded by the German Federal Ministry for Research, Technology and Space (BMFTR) and administered by the [Open Knowledge Foundation Deutschland](https://okfn.de). Stage 1 funding period: 6 months from June 2026.
 
 Create your own FeatureGroups, ComputeFrameworks, and Extenders as standalone packages. This repository serves two audiences:
 
