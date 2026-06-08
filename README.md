@@ -17,8 +17,8 @@
 Developed as part of the [Prototype Fund](https://prototypefund.de) (Round 2 / Jahrgang 02), funded by the German Federal Ministry of Research, Technology and Space (BMFTR) and supported by the [Open Knowledge Foundation Deutschland](https://okfn.de). Funding code (Förderkennzeichen): **16IS26S11**. Stage 1 funding period: 6 months from June 2026.
 
 <p>
-  <img src="logos/bmftr.svg" alt="Funded by the Federal Ministry of Research, Technology and Space (BMFTR)" height="120">
+  <img src="logos/bmftr.png" alt="Funded by the Federal Ministry of Research, Technology and Space (BMFTR)" height="110">
   &nbsp;&nbsp;&nbsp;
-  <img src="logos/prototypefund.svg" alt="Supported by the Prototype Fund" height="120">
+  <img src="logos/prototypefund.png" alt="Supported by the Prototype Fund" height="110">
 </p>
 
