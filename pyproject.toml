@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=82.0.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,7 +10,7 @@ version = "0.3.4"
 description = "mloda plugin providing connectors and harmonization for German government data (GovData.de CKAN API, Destatis GENESIS API v3)."
 license = "Apache-2.0"
 authors = [{ name = "Tom Kaltofen", email = "tomkaltofen@mloda.ai" }]
-dependencies = ["mloda>=0.6.1", "mloda-testing>=0.3.1"]
+dependencies = ["mloda>=0.8.0", "mloda-testing>=0.3.1"]
 requires-python = ">=3.10"
 
 [project.optional-dependencies]
