@@ -6,11 +6,19 @@
 
 # mloda-plugin-govdata
 
-> **Funding:** Developed as part of the [Prototype Fund](https://prototypefund.de) (Round 2 / Jahrgang 02), funded by the German Federal Ministry for Research, Technology and Space (BMFTR) and administered by the [Open Knowledge Foundation Deutschland](https://okfn.de). Stage 1 funding period: 6 months from June 2026.
-
 ## Related Repositories
 
 - **[mloda](https://github.com/mloda-ai/mloda)**: The core library for open data access. Declaratively define what data you need, not how to get it. mloda handles feature resolution, dependency management, and compute framework abstraction automatically.
 
 - **[mloda-registry](https://github.com/mloda-ai/mloda-registry)**: The central hub for discovering and sharing mloda plugins. Browse community-contributed FeatureGroups, find integration guides, and publish your own plugins for others to use.
+
+## Funding
+
+Developed as part of the [Prototype Fund](https://prototypefund.de) (Round 2 / Jahrgang 02), funded by the German Federal Ministry of Research, Technology and Space (BMFTR) and supported by the [Open Knowledge Foundation Deutschland](https://okfn.de). Funding code (Förderkennzeichen): **16IS26S11**. Stage 1 funding period: 6 months from June 2026.
+
+<p>
+  <img src="logos/bmftr.svg" alt="Funded by the Federal Ministry of Research, Technology and Space (BMFTR)" height="120">
+  &nbsp;&nbsp;&nbsp;
+  <img src="logos/prototypefund.svg" alt="Supported by the Prototype Fund" height="120">
+</p>
 
