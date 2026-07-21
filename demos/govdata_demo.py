@@ -94,10 +94,10 @@ def _(Feature, StuttgartPopulationReader, mloda):
     _slug = "einwohner-nach-altersgruppen-und-stadtbezirken"
     _result = mloda.run_all(
         [
-            Feature("Stichtag", options={StuttgartPopulationReader.__name__: _slug}),
-            Feature("Stadtbezirk", options={StuttgartPopulationReader.__name__: _slug}),
-            Feature("Alter in 10 Gruppen", options={StuttgartPopulationReader.__name__: _slug}),
-            Feature("Einwohner", options={StuttgartPopulationReader.__name__: _slug}),
+            Feature("Stichtag", options={StuttgartPopulationReader: _slug}),
+            Feature("Stadtbezirk", options={StuttgartPopulationReader: _slug}),
+            Feature("Alter in 10 Gruppen", options={StuttgartPopulationReader: _slug}),
+            Feature("Einwohner", options={StuttgartPopulationReader: _slug}),
         ],
         compute_frameworks=["PyArrowTable"],
     )
@@ -116,7 +116,7 @@ def _(mo):
 def _(BundeswahlleiterinReader, Feature, mloda):
     _kerg = "https://www.bundeswahlleiterin.de/bundestagswahlen/2025/ergebnisse/opendata/btw25/csv/kerg.csv"
     _result = mloda.run_all(
-        [Feature("Gebiet", options={BundeswahlleiterinReader.__name__: _kerg})],
+        [Feature("Gebiet", options={BundeswahlleiterinReader: _kerg})],
         compute_frameworks=["PyArrowTable"],
     )
     elections = _result[0].to_pandas()
@@ -135,8 +135,8 @@ def _(Feature, UbaAirReader, mloda, uba_measures_url):
     _url = uba_measures_url(station=143, component=3, scope=2, date_from="2025-01-01", date_to="2025-01-01")
     _result = mloda.run_all(
         [
-            Feature("date_start", options={UbaAirReader.__name__: _url}),
-            Feature("value", options={UbaAirReader.__name__: _url}),
+            Feature("date_start", options={UbaAirReader: _url}),
+            Feature("value", options={UbaAirReader: _url}),
         ],
         compute_frameworks=["PyArrowTable"],
     )

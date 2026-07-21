@@ -25,15 +25,16 @@ from mloda_plugin_govdata.feature_groups.govdata import StuttgartPopulationReade
 slug = "einwohner-nach-altersgruppen-und-stadtbezirken"
 result = mloda.run_all(
     [
-        Feature("Einwohner", options={StuttgartPopulationReader.__name__: slug}),
-        Feature("Stadtbezirk", options={StuttgartPopulationReader.__name__: slug}),
+        Feature("Einwohner", options={StuttgartPopulationReader: slug}),
+        Feature("Stadtbezirk", options={StuttgartPopulationReader: slug}),
     ],
     compute_frameworks=["PyArrowTable"],
 )
 table = result[0]  # pyarrow.Table with the requested columns
+result.plan  # resolved execution steps: which FeatureGroup ran on which framework
 ```
 
-The option value is a GovData dataset slug or a direct distribution URL. The license is read from the CKAN distribution metadata. Set `BaseGovDataReader.cache_dir` to control where downloads are cached. For any other GovData CSV dataset, `GovDataReader` works out of the box and reads every column as a string; subclass it and set `schema` for typed columns.
+The options key is the reader class or its class-name string; both select the same reader. The option value is a GovData dataset slug or a direct distribution URL. The license is read from the CKAN distribution metadata. Set `BaseGovDataReader.cache_dir` to control where downloads are cached. For any other GovData CSV dataset, `GovDataReader` works out of the box and reads every column as a string; subclass it and set `schema` for typed columns.
 
 Don't know the slug yet? Search GovData with the paginated CKAN `package_search` API:
 
@@ -62,7 +63,7 @@ from mloda_plugin_govdata.feature_groups.govdata import BundeswahlleiterinReader
 
 kerg = "https://www.bundeswahlleiterin.de/bundestagswahlen/2025/ergebnisse/opendata/btw25/csv/kerg.csv"
 result = mloda.run_all(
-    [Feature("Gebiet", options={BundeswahlleiterinReader.__name__: kerg})],
+    [Feature("Gebiet", options={BundeswahlleiterinReader: kerg})],
     compute_frameworks=["PyArrowTable"],
 )
 ```
@@ -75,8 +76,8 @@ from mloda_plugin_govdata.feature_groups.govdata import UbaAirReader, uba_measur
 url = uba_measures_url(station=143, component=3, scope=2, date_from="2025-01-01", date_to="2025-01-01")
 result = mloda.run_all(
     [
-        Feature("date_start", options={UbaAirReader.__name__: url}),
-        Feature("value", options={UbaAirReader.__name__: url}),
+        Feature("date_start", options={UbaAirReader: url}),
+        Feature("value", options={UbaAirReader: url}),
     ],
     compute_frameworks=["PyArrowTable"],
 )

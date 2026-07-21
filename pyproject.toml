@@ -11,7 +11,7 @@ description = "mloda plugin providing connectors and harmonization for German go
 license = "Apache-2.0"
 authors = [{ name = "Tom Kaltofen", email = "tomkaltofen@mloda.ai" }]
 dependencies = [
-    "mloda>=0.9.0",
+    "mloda>=0.10.0,<0.11.0",
     "mloda-testing>=0.3.1",
     "httpx>=0.27",
     "pandas>=2.0",

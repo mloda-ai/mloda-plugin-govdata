@@ -19,7 +19,8 @@ import pyarrow as pa
 from mloda.provider import FeatureSet
 
 # Imported for its registration side effect so "PyArrowTable" resolves; the reader returns a pyarrow Table.
-from mloda_plugins.compute_framework.base_implementations.pyarrow.table import PyArrowTable  # noqa: F401
+# Public path since mloda 0.10.0 (lazy export); resolving it imports and registers the framework class.
+from mloda.user import PyArrowTable  # noqa: F401
 from mloda_plugins.feature_group.input_data.read_file import ReadFile
 
 from .core.cache import DownloadCache
@@ -64,9 +65,9 @@ class BaseGovDataReader(ReadFile):
 
     @classmethod
     def load_data(cls, data_access: Any, features: FeatureSet) -> Any:
-        # Touch features first: the framework probes load_data(None, None) and
-        # only tolerates AttributeError to detect scoped-access support.
-        requested = sorted(features.get_all_names())  # deterministic column order
+        # Overriding load_data wholesale classifies this as a final reader (mloda >=0.10.0
+        # is_final_reader, structural, no runtime probe).
+        requested = list(features.get_all_names())  # sorted tuple since mloda 0.10.0; deterministic column order
         locator = cls._coerce_locator(data_access)
         table = cls._read_table(locator)
         available = set(table.column_names)
