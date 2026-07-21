@@ -6,7 +6,7 @@ from pathlib import Path
 import httpx
 import respx
 
-from mloda_plugin_govdata.feature_groups.govdata.cache import DownloadCache
+from mloda_plugin_govdata.feature_groups.govdata.core.cache import DownloadCache
 
 URL = "https://example.org/data.csv"
 BODY = b"Stichtag;Wert\r\n30.06.2020;1\r\n"

@@ -1,7 +1,8 @@
-"""CKAN discovery: resolve a GovData dataset to a distribution URL and license."""
+"""CKAN discovery: find GovData datasets and resolve them to a distribution URL and license."""
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 
@@ -9,7 +10,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict
 
 from .client import request_with_retry
-from .locator import GovDataLocator
+from .locator import DEFAULT_CKAN_BASE, GovDataLocator
 
 # dcat-ap.de license URIs observed across GovData distributions -> short labels.
 LICENSE_LABELS: dict[str, str] = {
@@ -88,6 +89,55 @@ def fetch_dataset(client: httpx.Client, locator: GovDataLocator) -> Dataset:
     if not payload.get("success"):
         raise ValueError(f"CKAN package_show was not successful for {locator.dataset_id!r}")
     return Dataset.from_ckan(payload["result"])
+
+
+def search_datasets(
+    client: httpx.Client,
+    query: str = "",
+    *,
+    ckan_base: str = DEFAULT_CKAN_BASE,
+    page_size: int = 100,
+    max_results: int | None = None,
+) -> Iterator[Dataset]:
+    """Search GovData via CKAN ``package_search``, paginating with ``rows``/``start``.
+
+    Yields datasets lazily page by page; ``max_results`` caps the total yield.
+    Stops early when the server returns an empty page, so a stale ``count``
+    cannot loop forever.
+    """
+    if page_size < 1:
+        raise ValueError(f"page_size must be >= 1, got {page_size}")
+    if max_results is not None and max_results < 1:
+        return
+
+    yielded = 0
+    start = 0
+    while True:
+        rows = page_size if max_results is None else min(page_size, max_results - yielded)
+        response = request_with_retry(
+            client,
+            "GET",
+            f"{ckan_base}/package_search",
+            params={"q": query, "rows": rows, "start": start},
+        )
+        response.raise_for_status()
+        payload: dict[str, Any] = response.json()
+        if not payload.get("success"):
+            raise ValueError(f"CKAN package_search was not successful for query {query!r}")
+        result = payload["result"]
+        results: list[dict[str, Any]] = result.get("results", [])
+        if not results:
+            return
+        for entry in results:
+            yield Dataset.from_ckan(entry)
+            yielded += 1
+            if max_results is not None and yielded >= max_results:
+                return
+        start += len(results)
+        count = result.get("count")
+        # Without a usable count, the empty-page guard above ends the walk.
+        if count is not None and start >= int(count):
+            return
 
 
 def _looks_like_csv(resource: Resource) -> bool:

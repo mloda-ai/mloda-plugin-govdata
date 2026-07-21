@@ -6,7 +6,7 @@ from pathlib import Path
 import pyarrow as pa
 import pytest
 
-from mloda_plugin_govdata.feature_groups.govdata.parse import (
+from mloda_plugin_govdata.feature_groups.govdata.core.parse import (
     ColumnType,
     detect_encoding,
     parse_german_csv,

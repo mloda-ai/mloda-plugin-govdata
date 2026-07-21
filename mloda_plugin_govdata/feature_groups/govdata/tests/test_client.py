@@ -4,7 +4,11 @@ import httpx
 import pytest
 import respx
 
-from mloda_plugin_govdata.feature_groups.govdata.client import RetryableStatusError, build_client, request_with_retry
+from mloda_plugin_govdata.feature_groups.govdata.core.client import (
+    RetryableStatusError,
+    build_client,
+    request_with_retry,
+)
 
 URL = "https://example.org/x"
 
@@ -13,7 +17,7 @@ URL = "https://example.org/x"
 def _instant_backoff(monkeypatch: pytest.MonkeyPatch) -> None:
     # Collapse tenacity's backoff to zero so retry tests run instantly.
     monkeypatch.setattr(
-        "mloda_plugin_govdata.feature_groups.govdata.client._BASE_WAIT",
+        "mloda_plugin_govdata.feature_groups.govdata.core.client._BASE_WAIT",
         lambda _state: 0.0,
     )
 

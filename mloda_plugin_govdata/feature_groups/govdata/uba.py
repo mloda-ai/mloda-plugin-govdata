@@ -1,9 +1,9 @@
-"""Umweltbundesamt (UBA) Air Data v4 ``measures`` endpoint: URL builder and JSON flatten.
+"""Umweltbundesamt (UBA) Air Data v4 ``measures`` endpoint: reader, URL builder, JSON flatten.
 
-The environment dataset is publisher-direct REST JSON, not a CSV distribution, so it
-has a distinct shape from the GovData / Bundeswahlleiterin CSV readers. The response is
-``{request, indices, data}`` where ``data`` is keyed by station then by measurement
-start datetime, and each leaf is ``[component id, scope id, value, date end, index]``.
+The environment dataset (M1 environment theme) is publisher-direct REST JSON, not a CSV
+distribution, so it has a distinct shape from the GovData / Bundeswahlleiterin CSV readers.
+The response is ``{request, indices, data}`` where ``data`` is keyed by station then by
+measurement start datetime, and each leaf is ``[component id, scope id, value, date end, index]``.
 The leaf order is fixed by the v4 contract, so the flatten maps it to a canonical schema by
 position and uses the self-describing ``indices.data`` block only to detect a changed layout.
 """
@@ -12,12 +12,16 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
 import pyarrow as pa
 
-from .parse import ColumnType
+from .core.discovery import ResolvedDistribution
+from .core.locator import GovDataLocator
+from .core.parse import ColumnType
+from .reader import BaseGovDataReader
 
 UBA_AIR_BASE = "https://luftdaten.umweltbundesamt.de/api/air-data/v4"
 
@@ -191,3 +195,21 @@ def parse_uba_measures(path: str | os.PathLike[str]) -> pa.Table:
     with open(path, "rb") as handle:
         data = handle.read()
     return parse_uba_measures_bytes(data)
+
+
+class UbaAirReader(BaseGovDataReader):
+    """Reads the UBA Air Data v4 ``measures`` JSON endpoint into a typed Arrow table.
+
+    The option value is a full ``measures`` URL (build one with :func:`uba_measures_url`);
+    the response is flattened to one row per station and measurement timestamp. Reuses the
+    client, cache, retry, and direct-URL resolution; only the parse seam differs from the
+    CSV readers.
+    """
+
+    @classmethod
+    def suffix(cls) -> tuple[str, ...]:
+        return (".json",)
+
+    @classmethod
+    def _parse(cls, path: Path, locator: GovDataLocator, distribution: ResolvedDistribution) -> pa.Table:
+        return parse_uba_measures(path)

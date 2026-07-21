@@ -13,9 +13,9 @@ from hypothesis import strategies as st
 
 from mloda.user import Feature, mloda
 
-from mloda_plugin_govdata.feature_groups.govdata.reader import UbaAirReader
 from mloda_plugin_govdata.feature_groups.govdata.uba import (
     UBA_AIR_BASE,
+    UbaAirReader,
     parse_uba_measures_bytes,
     uba_measures_url,
 )

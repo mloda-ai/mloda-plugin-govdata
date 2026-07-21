@@ -22,6 +22,7 @@ dependencies = [
 requires-python = ">=3.10"
 
 [project.optional-dependencies]
+demo = ["marimo>=0.14"]
 dev = [
     "tox",
     "tox-uv",
@@ -53,6 +54,8 @@ strict = true
 ignore_missing_imports = true
 namespace_packages = true
 explicit_package_bases = true
+# Marimo notebooks are generated cell functions without annotations; not library code.
+exclude = ["^demos/"]
 
 [tool.bandit]
 exclude_dirs = [".tox", ".venv", "tests"]

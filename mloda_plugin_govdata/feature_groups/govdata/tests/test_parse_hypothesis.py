@@ -3,7 +3,7 @@
 from hypothesis import given
 from hypothesis import strategies as st
 
-from mloda_plugin_govdata.feature_groups.govdata.parse import ColumnType, parse_german_csv_bytes
+from mloda_plugin_govdata.feature_groups.govdata.core.parse import ColumnType, parse_german_csv_bytes
 
 
 def _german_thousands(value: int) -> str:
