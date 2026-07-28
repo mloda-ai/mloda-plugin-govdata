@@ -63,3 +63,9 @@ exclude_dirs = [".tox", ".venv", "tests"]
 [tool.uv]
 exclude-newer = "7 days"
 exclude-newer-package = { mloda = "2026-12-31", "mloda-testing" = "2026-12-31", "mloda-registry" = "2026-12-31" }
+# Overrides, not constraints: marimo pins `pymdown-extensions<11`, and the fix for the
+# b64 path-traversal advisory only ships in 11.0. A constraint cannot beat that upper
+# pin, so the pin is overridden here. Drop this once marimo allows 11.x.
+override-dependencies = [
+    "pymdown-extensions>=11.0.1",
+]
