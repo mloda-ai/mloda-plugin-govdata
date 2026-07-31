@@ -37,7 +37,9 @@ class DownloadCache:
         self._owns_client = client is None
         self._client = client if client is not None else build_client()
 
-    def __enter__(self) -> "DownloadCache":
+    # PYI034/PYI019 want `Self`, which is 3.11+; the package floor is 3.10 and the class
+    # is never subclassed, so the concrete return type is accurate here.
+    def __enter__(self) -> DownloadCache:  # noqa: PYI034
         return self
 
     def __exit__(

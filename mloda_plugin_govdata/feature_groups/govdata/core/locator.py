@@ -26,14 +26,14 @@ class GovDataLocator:
             raise ValueError("GovDataLocator needs a dataset_id or a distribution_url.")
 
     @classmethod
-    def from_string(cls, value: str) -> "GovDataLocator":
+    def from_string(cls, value: str) -> GovDataLocator:
         """A URL becomes a direct distribution; anything else is a dataset id."""
         if value.startswith(("http://", "https://")):
             return cls(distribution_url=value)
         return cls(dataset_id=value)
 
     @classmethod
-    def coerce(cls, value: object) -> "GovDataLocator | None":
+    def coerce(cls, value: object) -> GovDataLocator | None:
         """Normalize a reader option value into a locator, or None if unusable."""
         if isinstance(value, GovDataLocator):
             return value

@@ -113,13 +113,13 @@ def test_multi_header_flattens_and_types_kerg(fixtures_dir: Path) -> None:
 
 
 def test_multi_header_forward_fills_merged_cells() -> None:
-    data = "Group;;Other\r\na;b;c\r\n1;2;3\r\n".encode("utf-8")
+    data = b"Group;;Other\r\na;b;c\r\n1;2;3\r\n"
     table = parse_multi_header_csv_bytes(data, skiprows=0, header_rows=2, label_columns=3, value_type=ColumnType.STRING)
     assert table.schema.names == ["Group a", "Group b", "Other c"]
 
 
 def test_multi_header_dedupes_duplicate_names() -> None:
-    data = "skip\r\nA;A\r\n1;2\r\n3;4\r\n".encode("utf-8")
+    data = b"skip\r\nA;A\r\n1;2\r\n3;4\r\n"
     table = parse_multi_header_csv_bytes(
         data, skiprows=1, header_rows=1, label_columns=0, value_type=ColumnType.INTEGER
     )
@@ -130,13 +130,13 @@ def test_multi_header_dedupes_duplicate_names() -> None:
 
 def test_multi_header_does_not_fill_padded_cells() -> None:
     # The top header row omits a trailing cell; padding must not forward-fill into it.
-    data = "A;B\r\nx;y;z\r\n1;2;3\r\n".encode("utf-8")
+    data = b"A;B\r\nx;y;z\r\n1;2;3\r\n"
     table = parse_multi_header_csv_bytes(data, skiprows=0, header_rows=2, label_columns=3, value_type=ColumnType.STRING)
     assert table.schema.names == ["A x", "B y", "z"]
 
 
 def test_multi_header_dedupe_handles_existing_suffix() -> None:
-    data = "A;A (2);A\r\n1;2;3\r\n".encode("utf-8")
+    data = b"A;A (2);A\r\n1;2;3\r\n"
     table = parse_multi_header_csv_bytes(
         data, skiprows=0, header_rows=1, label_columns=0, value_type=ColumnType.INTEGER
     )
@@ -144,7 +144,7 @@ def test_multi_header_dedupe_handles_existing_suffix() -> None:
 
 
 def test_multi_header_empty_measure_is_null() -> None:
-    data = "Region;Votes\r\nBerlin;\r\nHamburg;5\r\n".encode("utf-8")
+    data = b"Region;Votes\r\nBerlin;\r\nHamburg;5\r\n"
     table = parse_multi_header_csv_bytes(
         data, skiprows=0, header_rows=1, label_columns=1, value_type=ColumnType.INTEGER
     )

@@ -87,7 +87,9 @@ def _to_date(raw: str) -> date | None:
     value = raw.strip()
     if value in NULL_MARKERS:
         return None
-    return datetime.strptime(value, GERMAN_DATE_FORMAT).date()
+    # Publisher columns are calendar dates (Stichtag), not instants; .date() drops the time,
+    # so attaching a timezone would invent precision the source does not have.
+    return datetime.strptime(value, GERMAN_DATE_FORMAT).date()  # noqa: DTZ007
 
 
 def _to_string(raw: str) -> str | None:

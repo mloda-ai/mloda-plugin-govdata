@@ -49,6 +49,12 @@ addopts = "-m 'not live'"
 [tool.ruff]
 line-length = 120
 
+[tool.ruff.lint.per-file-ignores]
+# Marimo notebooks are generated cell functions: a bare trailing expression is the cell's
+# displayed output, the trailing `return` is generator structure, and imports live inside
+# cells and are re-emitted on every regeneration. Linting these fights the generator.
+"demos/*" = ["B018", "PLR1711", "I001"]
+
 [tool.mypy]
 strict = true
 ignore_missing_imports = true

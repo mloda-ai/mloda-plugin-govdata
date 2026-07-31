@@ -96,9 +96,8 @@ def test_search_datasets_empty_result() -> None:
 @respx.mock
 def test_search_datasets_unsuccessful_payload_raises() -> None:
     respx.get(PACKAGE_SEARCH).mock(return_value=httpx.Response(200, json={"success": False}))
-    with build_client() as client:
-        with pytest.raises(ValueError, match="package_search"):
-            list(search_datasets(client, "einwohner"))
+    with build_client() as client, pytest.raises(ValueError, match="package_search"):
+        list(search_datasets(client, "einwohner"))
 
 
 @respx.mock
@@ -147,9 +146,8 @@ def test_search_datasets_shrinks_rows_near_max_results_and_honors_ckan_base() ->
 
 
 def test_search_datasets_rejects_bad_page_size() -> None:
-    with build_client() as client:
-        with pytest.raises(ValueError, match="page_size"):
-            list(search_datasets(client, "einwohner", page_size=0))
+    with build_client() as client, pytest.raises(ValueError, match="page_size"):
+        list(search_datasets(client, "einwohner", page_size=0))
 
 
 @pytest.mark.live

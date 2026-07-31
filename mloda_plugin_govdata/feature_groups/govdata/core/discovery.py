@@ -57,7 +57,7 @@ class Dataset(BaseModel):
     extras: dict[str, str] = {}
 
     @classmethod
-    def from_ckan(cls, result: dict[str, Any]) -> "Dataset":
+    def from_ckan(cls, result: dict[str, Any]) -> Dataset:
         extras = {e["key"]: str(e.get("value", "")) for e in result.get("extras", []) if "key" in e}
         resources = [Resource.model_validate(r) for r in result.get("resources", [])]
         return cls(

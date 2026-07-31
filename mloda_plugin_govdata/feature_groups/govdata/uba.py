@@ -165,12 +165,14 @@ def parse_uba_measures_bytes(data: bytes) -> pa.Table:
     nulls. Raises ``ValueError`` if the payload has no ``data`` object or self-describes a leaf
     width other than the expected one.
     """
+    # A malformed response body is bad data, not a caller type error, so TRY004 is suppressed
+    # below: the documented contract (and the tests) is that parse failures surface as ValueError.
     payload = json.loads(data)
     if not isinstance(payload, dict):
-        raise ValueError("UBA measures payload is not a JSON object")
+        raise ValueError("UBA measures payload is not a JSON object")  # noqa: TRY004
     series_by_station = payload.get("data")
     if not isinstance(series_by_station, dict):
-        raise ValueError("UBA measures payload has no 'data' object")
+        raise ValueError("UBA measures payload has no 'data' object")  # noqa: TRY004
     _check_layout(payload)
 
     station_col, datetime_col = MEASURE_COLUMNS[0], MEASURE_COLUMNS[1]

@@ -10,7 +10,6 @@ import pytest
 import respx
 from hypothesis import given
 from hypothesis import strategies as st
-
 from mloda.user import Feature, mloda
 
 from mloda_plugin_govdata.feature_groups.govdata.uba import (

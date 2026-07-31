@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import pyarrow as pa
-
 from mloda.provider import FeatureSet
 
 # Imported for its registration side effect so "PyArrowTable" resolves; the reader returns a pyarrow Table.
