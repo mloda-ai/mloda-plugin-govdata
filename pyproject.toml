@@ -8,6 +8,7 @@ name = "mloda-plugin-govdata"
 # Initial release for semver needs also a manually pushed minimum tag (likely 0.2.0).
 version = "0.2.1"
 description = "mloda plugin providing connectors and harmonization for German government data (GovData.de CKAN API, Destatis GENESIS API v3)."
+readme = "README.md"
 license = "Apache-2.0"
 authors = [{ name = "Tom Kaltofen", email = "tomkaltofen@mloda.ai" }]
 dependencies = [
