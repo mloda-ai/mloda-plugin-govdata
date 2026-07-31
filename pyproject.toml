@@ -27,6 +27,7 @@ Homepage = "https://github.com/mloda-ai/mloda-plugin-govdata"
 Repository = "https://github.com/mloda-ai/mloda-plugin-govdata"
 Issues = "https://github.com/mloda-ai/mloda-plugin-govdata/issues"
 Releases = "https://github.com/mloda-ai/mloda-plugin-govdata/releases"
+"Prototype Fund" = "https://www.prototypefund.de/projects/mloda-plugin-govdata"
 
 [project.optional-dependencies]
 demo = ["marimo>=0.14"]
