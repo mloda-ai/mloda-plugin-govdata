@@ -22,6 +22,12 @@ dependencies = [
 ]
 requires-python = ">=3.10"
 
+[project.urls]
+Homepage = "https://github.com/mloda-ai/mloda-plugin-govdata"
+Repository = "https://github.com/mloda-ai/mloda-plugin-govdata"
+Issues = "https://github.com/mloda-ai/mloda-plugin-govdata/issues"
+Releases = "https://github.com/mloda-ai/mloda-plugin-govdata/releases"
+
 [project.optional-dependencies]
 demo = ["marimo>=0.14"]
 dev = [
