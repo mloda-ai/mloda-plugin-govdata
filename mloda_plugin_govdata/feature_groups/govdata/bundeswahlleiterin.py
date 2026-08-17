@@ -73,6 +73,15 @@ class BundeswahlleiterinReader(BaseGovDataReader):
     }
 
     @classmethod
+    def match_subclass_data_access(cls, data_access: Any, feature_names: list[str], options: Any) -> Any:
+        locator = super().match_subclass_data_access(data_access, feature_names, options)
+        if locator is None:
+            return None
+        for key in (OPTION_WAHL_SKIPROWS, OPTION_WAHL_HEADER_ROWS, OPTION_WAHL_LABEL_COLUMNS, OPTION_WAHL_VALUE_TYPE):
+            cls._scalar_reader_option(key, options)
+        return locator
+
+    @classmethod
     def _parse(
         cls, path: Path, locator: GovDataLocator, distribution: ResolvedDistribution, options: Options | None = None
     ) -> pa.Table:
