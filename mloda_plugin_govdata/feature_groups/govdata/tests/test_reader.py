@@ -216,6 +216,26 @@ def test_bad_geometry_option_raises(fixtures_dir: Path) -> None:
         BundeswahlleiterinReader._parse(fixtures_dir / "kerg_sample.csv", locator, distribution, options)
 
 
+@pytest.mark.parametrize(
+    ("bad_option", "bad_value"),
+    [
+        (OPTION_WAHL_SKIPROWS, -1),
+        (OPTION_WAHL_HEADER_ROWS, 0),
+        (OPTION_WAHL_LABEL_COLUMNS, -1),
+        (OPTION_WAHL_VALUE_TYPE, "not-a-column-type"),
+    ],
+)
+def test_invalid_geometry_option_rejected_before_any_network_call(bad_option: str, bad_value: Any) -> None:
+    # strict_validation on READER_OPTIONS (mloda >=0.11.0 PropertySpec) rejects a bad geometry
+    # value during feature resolution, before locator/CKAN/download; respx has no mocks
+    # registered here, so a network attempt would fail loudly rather than silently pass.
+    with pytest.raises(ValueError, match=f"reader option '{bad_option}' value .* is rejected"):
+        mloda.run_all(
+            [Feature("Gebiet", options={BundeswahlleiterinReader.__name__: KERG_URL, bad_option: bad_value})],
+            compute_frameworks=["PyArrowTable"],
+        )
+
+
 @pytest.mark.live
 def test_berlin_wahl_live_end_to_end() -> None:
     result = mloda.run_all(

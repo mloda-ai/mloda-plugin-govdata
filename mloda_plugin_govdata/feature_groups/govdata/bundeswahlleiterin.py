@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import numbers
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import pyarrow as pa
-from mloda.provider import PropertySpec
+from mloda.provider import PropertySpec, is_positive_int
 from mloda.user import Options
 
 from .core.discovery import ResolvedDistribution
@@ -22,6 +23,18 @@ OPTION_WAHL_LABEL_COLUMNS = "govdata_wahl_label_columns"
 OPTION_WAHL_VALUE_TYPE = "govdata_wahl_value_type"
 
 
+def _is_non_negative_int(value: Any) -> bool:
+    """Element validator for a count that may legitimately be zero (the degenerate geometry:
+    a single-header export needs ``skiprows=0`` or ``label_columns=0``). Mirrors mloda's
+    ``is_positive_int`` (rejects bool, accepts numpy integers and decimal strings) but admits 0.
+    """
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, numbers.Integral):
+        return int(value) >= 0
+    return isinstance(value, str) and value.isdecimal() and int(value) >= 0
+
+
 class BundeswahlleiterinReader(BaseGovDataReader):
     """Reads German election-result CSVs with the Bundeswahlleiterin kerg.csv as the default geometry.
 
@@ -33,10 +46,30 @@ class BundeswahlleiterinReader(BaseGovDataReader):
     """
 
     READER_OPTIONS: ClassVar[dict[str, PropertySpec]] = {
-        OPTION_WAHL_SKIPROWS: PropertySpec("Preamble lines to skip before the header block.", default=5),
-        OPTION_WAHL_HEADER_ROWS: PropertySpec("Merged header rows flattened into column names.", default=3),
-        OPTION_WAHL_LABEL_COLUMNS: PropertySpec("Leading columns typed as strings, not value_type.", default=4),
-        OPTION_WAHL_VALUE_TYPE: PropertySpec("ColumnType of the non-label columns.", default=ColumnType.INTEGER),
+        OPTION_WAHL_SKIPROWS: PropertySpec(
+            "Preamble lines to skip before the header block.",
+            default=5,
+            strict_validation=True,
+            element_validator=_is_non_negative_int,
+        ),
+        OPTION_WAHL_HEADER_ROWS: PropertySpec(
+            "Merged header rows flattened into column names.",
+            default=3,
+            strict_validation=True,
+            element_validator=is_positive_int,
+        ),
+        OPTION_WAHL_LABEL_COLUMNS: PropertySpec(
+            "Leading columns typed as strings, not value_type.",
+            default=4,
+            strict_validation=True,
+            element_validator=_is_non_negative_int,
+        ),
+        OPTION_WAHL_VALUE_TYPE: PropertySpec(
+            "ColumnType of the non-label columns.",
+            default=ColumnType.INTEGER,
+            strict_validation=True,
+            allowed_values=tuple(ColumnType),
+        ),
     }
 
     @classmethod
