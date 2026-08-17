@@ -16,9 +16,6 @@ from typing import Any, ClassVar
 
 import pyarrow as pa
 from mloda.provider import FeatureSet
-
-# PyArrowTable is imported for its registration side effect so "PyArrowTable" resolves; it now
-# lives in mloda.user.pyarrow (moved out of mloda.user in mloda 0.11.0).
 from mloda.user import Options
 from mloda.user.pyarrow import PyArrowTable  # noqa: F401
 from mloda_plugins.feature_group.input_data.read_file import ReadFile
