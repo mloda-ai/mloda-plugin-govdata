@@ -21,9 +21,31 @@ from .core.parse import ColumnType, parse_german_csv, parse_german_csv_bytes, pa
 from .feature import GovDataFeature
 from .population import POPULATION_SCHEMA, POPULATION_SLUG, StuttgartPopulationReader
 from .reader import BaseGovDataReader, GovDataReader
-from .uba import UBA_AIR_BASE, UbaAirReader, parse_uba_measures, parse_uba_measures_bytes, uba_measures_url
+from .uba import (
+    OPTION_UBA_COMPONENT,
+    OPTION_UBA_DATE_FROM,
+    OPTION_UBA_DATE_TO,
+    OPTION_UBA_LANG,
+    OPTION_UBA_SCOPE,
+    OPTION_UBA_STATION,
+    OPTION_UBA_TIME_FROM,
+    OPTION_UBA_TIME_TO,
+    UBA_AIR_BASE,
+    UbaAirReader,
+    parse_uba_measures,
+    parse_uba_measures_bytes,
+    uba_measures_url,
+)
 
 __all__ = [
+    "OPTION_UBA_COMPONENT",
+    "OPTION_UBA_DATE_FROM",
+    "OPTION_UBA_DATE_TO",
+    "OPTION_UBA_LANG",
+    "OPTION_UBA_SCOPE",
+    "OPTION_UBA_STATION",
+    "OPTION_UBA_TIME_FROM",
+    "OPTION_UBA_TIME_TO",
     "OPTION_WAHL_HEADER_ROWS",
     "OPTION_WAHL_LABEL_COLUMNS",
     "OPTION_WAHL_SKIPROWS",

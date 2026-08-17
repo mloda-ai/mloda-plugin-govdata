@@ -40,15 +40,24 @@ def _():
 
     from mloda.user import Feature, mloda
     from mloda_plugin_govdata.feature_groups.govdata import (
+        OPTION_UBA_COMPONENT,
+        OPTION_UBA_DATE_FROM,
+        OPTION_UBA_DATE_TO,
+        OPTION_UBA_SCOPE,
+        OPTION_UBA_STATION,
         BundeswahlleiterinReader,
         StuttgartPopulationReader,
         UbaAirReader,
         build_client,
         search_datasets,
-        uba_measures_url,
     )
 
     return (
+        OPTION_UBA_COMPONENT,
+        OPTION_UBA_DATE_FROM,
+        OPTION_UBA_DATE_TO,
+        OPTION_UBA_SCOPE,
+        OPTION_UBA_STATION,
         BundeswahlleiterinReader,
         Feature,
         StuttgartPopulationReader,
@@ -57,7 +66,6 @@ def _():
         mloda,
         pd,
         search_datasets,
-        uba_measures_url,
     )
 
 
@@ -131,12 +139,28 @@ def _(mo):
 
 
 @app.cell
-def _(Feature, UbaAirReader, mloda, uba_measures_url):
-    _url = uba_measures_url(station=143, component=3, scope=2, date_from="2025-01-01", date_to="2025-01-01")
+def _(
+    OPTION_UBA_COMPONENT,
+    OPTION_UBA_DATE_FROM,
+    OPTION_UBA_DATE_TO,
+    OPTION_UBA_SCOPE,
+    OPTION_UBA_STATION,
+    Feature,
+    UbaAirReader,
+    mloda,
+):
+    _uba_options = {
+        UbaAirReader: True,
+        OPTION_UBA_STATION: 143,
+        OPTION_UBA_COMPONENT: 3,
+        OPTION_UBA_SCOPE: 2,
+        OPTION_UBA_DATE_FROM: "2025-01-01",
+        OPTION_UBA_DATE_TO: "2025-01-01",
+    }
     _result = mloda.run_all(
         [
-            Feature("date_start", options={UbaAirReader: _url}),
-            Feature("value", options={UbaAirReader: _url}),
+            Feature("date_start", options=_uba_options),
+            Feature("value", options=_uba_options),
         ],
         compute_frameworks=["PyArrowTable"],
     )

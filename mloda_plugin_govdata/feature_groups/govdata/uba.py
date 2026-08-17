@@ -11,12 +11,15 @@ position and uses the self-describing ``indices.data`` block only to detect a ch
 from __future__ import annotations
 
 import json
+import numbers
 import os
+from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import urlencode
 
 import pyarrow as pa
+from mloda.provider import PropertySpec, is_positive_int
 from mloda.user import Options
 
 from .core.discovery import ResolvedDistribution
@@ -25,6 +28,39 @@ from .core.parse import ColumnType
 from .reader import BaseGovDataReader
 
 UBA_AIR_BASE = "https://luftdaten.umweltbundesamt.de/api/air-data/v4"
+
+# Feature-option keys for the measures query. station/component/scope/date_from/date_to have no
+# sensible default (each query targets a specific station and window), so they are required.
+OPTION_UBA_STATION = "govdata_uba_station"
+OPTION_UBA_COMPONENT = "govdata_uba_component"
+OPTION_UBA_SCOPE = "govdata_uba_scope"
+OPTION_UBA_DATE_FROM = "govdata_uba_date_from"
+OPTION_UBA_DATE_TO = "govdata_uba_date_to"
+OPTION_UBA_TIME_FROM = "govdata_uba_time_from"
+OPTION_UBA_TIME_TO = "govdata_uba_time_to"
+OPTION_UBA_LANG = "govdata_uba_lang"
+
+
+def _is_hour_slot(value: Any) -> bool:
+    """Element validator for the v4 hour-slot params (1-24). Mirrors mloda's is_positive_int
+    (rejects bool, accepts numpy integers and decimal strings) with an upper bound."""
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, numbers.Integral):
+        return 1 <= int(value) <= 24
+    return isinstance(value, str) and value.isdecimal() and 1 <= int(value) <= 24
+
+
+def _is_iso_date(value: Any) -> bool:
+    """Element validator for date_from/date_to: a real calendar date in YYYY-MM-DD."""
+    if not isinstance(value, str):
+        return False
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
 
 # Canonical, stable output schema. The v4 measures leaf array is fixed by the API contract as
 # [component id, scope id, value, date end, index]; the outer keys prepend the station id and the
@@ -201,17 +237,75 @@ def parse_uba_measures(path: str | os.PathLike[str]) -> pa.Table:
 
 
 class UbaAirReader(BaseGovDataReader):
-    """Reads the UBA Air Data v4 ``measures`` JSON endpoint into a typed Arrow table.
+    """Reads the UBA Air Data v4 ``measures`` endpoint into a typed Arrow table.
 
-    The option value is a full ``measures`` URL (build one with :func:`uba_measures_url`);
-    the response is flattened to one row per station and measurement timestamp. Reuses the
-    client, cache, retry, and direct-URL resolution; only the parse seam differs from the
-    CSV readers.
+    Query parameters are per-feature options, not a pre-built URL: point a feature at this
+    reader with a truthy class-name key, then supply ``OPTION_UBA_STATION``,
+    ``OPTION_UBA_COMPONENT``, ``OPTION_UBA_SCOPE``, ``OPTION_UBA_DATE_FROM``, and
+    ``OPTION_UBA_DATE_TO`` (``OPTION_UBA_TIME_FROM``/``_TIME_TO``/``_LANG`` are optional, matching
+    :func:`uba_measures_url`'s defaults). A bad value is rejected during feature resolution,
+    before any network call::
+
+        Feature("value", options={
+            UbaAirReader: True,
+            OPTION_UBA_STATION: 143,
+            OPTION_UBA_COMPONENT: 3,
+            OPTION_UBA_SCOPE: 2,
+            OPTION_UBA_DATE_FROM: "2025-01-01",
+            OPTION_UBA_DATE_TO: "2025-01-01",
+        })
+
+    The response is flattened to one row per station and measurement timestamp. Reuses the
+    client, cache, retry, and direct-URL resolution; only the parse seam and locator building
+    differ from the CSV readers.
     """
+
+    READER_OPTIONS: ClassVar[dict[str, PropertySpec]] = {
+        OPTION_UBA_STATION: PropertySpec("UBA station id.", strict_validation=True, element_validator=is_positive_int),
+        OPTION_UBA_COMPONENT: PropertySpec(
+            "UBA component id (see the UBA components endpoint).",
+            strict_validation=True,
+            element_validator=is_positive_int,
+        ),
+        OPTION_UBA_SCOPE: PropertySpec(
+            "UBA scope id (see the UBA scopes endpoint).",
+            strict_validation=True,
+            element_validator=is_positive_int,
+        ),
+        OPTION_UBA_DATE_FROM: PropertySpec(
+            "Query window start, YYYY-MM-DD.", strict_validation=True, element_validator=_is_iso_date
+        ),
+        OPTION_UBA_DATE_TO: PropertySpec(
+            "Query window end, YYYY-MM-DD.", strict_validation=True, element_validator=_is_iso_date
+        ),
+        OPTION_UBA_TIME_FROM: PropertySpec(
+            "Start hour slot (1-24).", default=1, strict_validation=True, element_validator=_is_hour_slot
+        ),
+        OPTION_UBA_TIME_TO: PropertySpec(
+            "End hour slot (1-24).", default=24, strict_validation=True, element_validator=_is_hour_slot
+        ),
+        OPTION_UBA_LANG: PropertySpec("UBA API response language.", default="en"),
+    }
 
     @classmethod
     def suffix(cls) -> tuple[str, ...]:
         return (".json",)
+
+    @classmethod
+    def match_subclass_data_access(cls, data_access: Any, feature_names: list[str], options: Any) -> Any:
+        if not data_access:
+            return None
+        url = uba_measures_url(
+            station=cls.reader_option(OPTION_UBA_STATION, options),
+            component=cls.reader_option(OPTION_UBA_COMPONENT, options),
+            scope=cls.reader_option(OPTION_UBA_SCOPE, options),
+            date_from=cls.reader_option(OPTION_UBA_DATE_FROM, options),
+            date_to=cls.reader_option(OPTION_UBA_DATE_TO, options),
+            time_from=cls.reader_option(OPTION_UBA_TIME_FROM, options),
+            time_to=cls.reader_option(OPTION_UBA_TIME_TO, options),
+            lang=cls.reader_option(OPTION_UBA_LANG, options),
+        )
+        return GovDataLocator(distribution_url=url)
 
     @classmethod
     def _parse(
