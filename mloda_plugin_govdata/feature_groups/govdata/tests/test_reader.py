@@ -66,8 +66,8 @@ def test_feature_group_uses_base_govdata_reader() -> None:
 
 
 def test_class_options_key_normalizes_to_reader_name() -> None:
-    # The reader class works as an options key; it normalizes to the class-name string (mloda >=0.10.0).
-    # The cast bridges a 0.10.0 typing gap: the runtime accepts class keys, the hints only admit str.
+    # The reader class works as an options key; it normalizes to the class-name string.
+    # The cast bridges a still-open typing gap: the runtime accepts class keys, the hints only admit str.
     options = Options(cast(dict[str, Any], {GovDataReader: SLUG}))
     assert options.get(GovDataReader.__name__) == SLUG
 
