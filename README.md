@@ -68,7 +68,7 @@ result = mloda.run_all(
 )
 ```
 
-The environment reader fetches the Umweltbundesamt (UBA) Air Data v4 `measures` endpoint (REST JSON) and flattens it to one typed row per station and timestamp. Query parameters are per-feature options, not a pre-built URL (here: hourly ozone at station 143); a bad value (an unknown station id, a malformed date) is rejected during feature resolution, before any network call:
+The environment reader fetches the Umweltbundesamt (UBA) Air Data v4 `measures` endpoint (REST JSON) and flattens it to one typed row per station and timestamp. Query parameters are per-feature options, not a pre-built URL (here: hourly ozone at station 143); a bad value is rejected during feature resolution, before any network call:
 
 ```python
 from mloda_plugin_govdata.feature_groups.govdata import (

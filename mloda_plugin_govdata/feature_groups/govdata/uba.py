@@ -239,25 +239,12 @@ def parse_uba_measures(path: str | os.PathLike[str]) -> pa.Table:
 class UbaAirReader(BaseGovDataReader):
     """Reads the UBA Air Data v4 ``measures`` endpoint into a typed Arrow table.
 
-    Query parameters are per-feature options, not a pre-built URL: point a feature at this
-    reader with a truthy class-name key, then supply ``OPTION_UBA_STATION``,
-    ``OPTION_UBA_COMPONENT``, ``OPTION_UBA_SCOPE``, ``OPTION_UBA_DATE_FROM``, and
-    ``OPTION_UBA_DATE_TO`` (``OPTION_UBA_TIME_FROM``/``_TIME_TO``/``_LANG`` are optional, matching
-    :func:`uba_measures_url`'s defaults). A bad value is rejected during feature resolution,
-    before any network call::
-
-        Feature("value", options={
-            UbaAirReader: True,
-            OPTION_UBA_STATION: 143,
-            OPTION_UBA_COMPONENT: 3,
-            OPTION_UBA_SCOPE: 2,
-            OPTION_UBA_DATE_FROM: "2025-01-01",
-            OPTION_UBA_DATE_TO: "2025-01-01",
-        })
-
-    The response is flattened to one row per station and measurement timestamp. Reuses the
-    client, cache, retry, and direct-URL resolution; only the parse seam and locator building
-    differ from the CSV readers.
+    Query parameters are per-feature options (``OPTION_UBA_STATION``, ``_COMPONENT``, ``_SCOPE``,
+    ``_DATE_FROM``, ``_DATE_TO``; ``_TIME_FROM``/``_TIME_TO``/``_LANG`` optional), not a pre-built
+    URL; a bad value is rejected during feature resolution, before any network call. The response
+    is flattened to one row per station and measurement timestamp. Reuses the client, cache,
+    retry, and direct-URL resolution; only the parse seam and locator building differ from the
+    CSV readers.
     """
 
     READER_OPTIONS: ClassVar[dict[str, PropertySpec]] = {
