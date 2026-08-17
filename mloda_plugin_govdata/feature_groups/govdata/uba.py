@@ -29,8 +29,6 @@ from .reader import BaseGovDataReader
 
 UBA_AIR_BASE = "https://luftdaten.umweltbundesamt.de/api/air-data/v4"
 
-# Feature-option keys for the measures query. station/component/scope/date_from/date_to have no
-# sensible default (each query targets a specific station and window), so they are required.
 OPTION_UBA_STATION = "govdata_uba_station"
 OPTION_UBA_COMPONENT = "govdata_uba_component"
 OPTION_UBA_SCOPE = "govdata_uba_scope"
@@ -42,8 +40,6 @@ OPTION_UBA_LANG = "govdata_uba_lang"
 
 
 def _is_hour_slot(value: Any) -> bool:
-    """Element validator for the v4 hour-slot params (1-24). Mirrors mloda's is_positive_int
-    (rejects bool, accepts numpy integers and decimal strings) with an upper bound."""
     if isinstance(value, bool):
         return False
     if isinstance(value, numbers.Integral):
@@ -52,11 +48,6 @@ def _is_hour_slot(value: Any) -> bool:
 
 
 def _is_iso_date(value: Any) -> bool:
-    """Element validator for date_from/date_to: a real calendar date in YYYY-MM-DD.
-
-    date.fromisoformat also accepts basic ("20250101") and week ("2025-W01-1") forms on
-    Python >= 3.11, so the extended-format shape is checked before parsing.
-    """
     if not isinstance(value, str) or len(value) != 10 or value[4] != "-" or value[7] != "-":
         return False
     try:
@@ -243,10 +234,7 @@ def parse_uba_measures(path: str | os.PathLike[str]) -> pa.Table:
 class UbaAirReader(BaseGovDataReader):
     """Reads the UBA Air Data v4 ``measures`` endpoint into a typed Arrow table.
 
-    The class-name option key must be exactly ``True`` (a routing marker, not a locator); query
-    parameters are the per-feature options ``OPTION_UBA_STATION``, ``_COMPONENT``, ``_SCOPE``,
-    ``_DATE_FROM``, ``_DATE_TO`` (``_TIME_FROM``/``_TIME_TO``/``_LANG`` optional), not a pre-built
-    URL. A bad value is rejected during feature resolution, before any network call. The response
+    Query parameters are per-feature ``OPTION_UBA_*`` options, not a pre-built URL. The response
     is flattened to one row per station and measurement timestamp. Reuses the client, cache,
     retry, and direct-URL resolution; only the parse seam and locator building differ from the
     CSV readers.
@@ -285,19 +273,13 @@ class UbaAirReader(BaseGovDataReader):
 
     @classmethod
     def _scalar_reader_option(cls, key: str, options: Any) -> Any:
-        """cls.reader_option(key, options), rejecting a collection: mloda validates
-        list/tuple/set/frozenset element-wise, but each measures query param takes one value."""
         value = cls.reader_option(key, options)
         if isinstance(value, (list, tuple, set, frozenset)):
-            # A rejected option value, not a caller type error, so TRY004 is suppressed: mloda's
-            # reader-option contract (and the tests) is that a rejection surfaces as ValueError.
             raise ValueError(f"{cls.__name__} option '{key}' takes a single value, got {value!r}.")  # noqa: TRY004
         return value
 
     @classmethod
     def match_subclass_data_access(cls, data_access: Any, feature_names: list[str], options: Any) -> Any:
-        # data_access is a routing marker, not a locator: only the documented True claims this
-        # reader. A DataAccessCollection probed via global scope is always truthy but not True.
         if data_access is not True:
             return None
         date_from = cls._scalar_reader_option(OPTION_UBA_DATE_FROM, options)

@@ -225,20 +225,16 @@ def test_uba_reader_level2_with_non_default_time_and_lang(
         (OPTION_UBA_COMPONENT, 0),
         (OPTION_UBA_SCOPE, "not-a-number"),
         (OPTION_UBA_DATE_FROM, "2025-13-40"),
-        (OPTION_UBA_DATE_FROM, "20250101"),  # basic ISO form; date.fromisoformat also accepts it on 3.11+
-        (OPTION_UBA_DATE_FROM, "2025-W01-1"),  # week-date ISO form; same
+        (OPTION_UBA_DATE_FROM, "20250101"),
+        (OPTION_UBA_DATE_FROM, "2025-W01-1"),
         (OPTION_UBA_DATE_TO, "not-a-date"),
-        (OPTION_UBA_DATE_TO, date(2025, 1, 1)),  # a real date object, not the required str
+        (OPTION_UBA_DATE_TO, date(2025, 1, 1)),
         (OPTION_UBA_TIME_FROM, 0),
         (OPTION_UBA_TIME_TO, 25),
     ],
 )
 @respx.mock
 def test_invalid_uba_option_rejected_before_any_network_call(bad_option: str, bad_value: Any) -> None:
-    # strict_validation on READER_OPTIONS (mloda >=0.11.0 PropertySpec) rejects a bad query
-    # parameter during feature resolution, before building the URL or calling the live API;
-    # @respx.mock with no routes registered turns any attempted request into a respx error, so a
-    # regression that skips validation fails loudly here instead of quietly reaching the network.
     options = dict(_demo_options())
     options[bad_option] = bad_value
     with pytest.raises(ValueError, match=f"reader option '{bad_option}' value .* is rejected"):
@@ -255,9 +251,6 @@ def test_missing_required_uba_option_rejected_before_any_network_call() -> None:
 
 @respx.mock
 def test_station_collection_value_rejected_before_any_network_call() -> None:
-    # _reader_options_admit validates list/tuple/set/frozenset element-wise, so a collection
-    # passes per-element validation; match_subclass_data_access must still reject it as a whole,
-    # since uba_measures_url takes one station per query.
     options = dict(_demo_options())
     options[OPTION_UBA_STATION] = [143, 144]
     with pytest.raises(ValueError, match="takes a single value"):
@@ -283,8 +276,6 @@ def test_inverted_time_window_rejected_before_any_network_call() -> None:
 
 @respx.mock
 def test_explicit_time_boundaries_accepted(fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    # The default (time_from=1, time_to=24) never runs through _is_hour_slot, since
-    # _reader_options_admit validates only present values; pin the boundaries when explicit.
     monkeypatch.setattr(UbaAirReader, "cache_dir", str(tmp_path))
     measures_bytes = (fixtures_dir / "uba_measures.json").read_bytes()
     respx.get(_demo_url()).mock(return_value=httpx.Response(200, content=measures_bytes))
