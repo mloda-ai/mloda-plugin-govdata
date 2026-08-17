@@ -225,10 +225,8 @@ def test_bad_geometry_option_raises(fixtures_dir: Path) -> None:
         (OPTION_WAHL_VALUE_TYPE, "not-a-column-type"),
     ],
 )
+@respx.mock
 def test_invalid_geometry_option_rejected_before_any_network_call(bad_option: str, bad_value: Any) -> None:
-    # strict_validation on READER_OPTIONS (mloda >=0.11.0 PropertySpec) rejects a bad geometry
-    # value during feature resolution, before locator/CKAN/download; respx has no mocks
-    # registered here, so a network attempt would fail loudly rather than silently pass.
     with pytest.raises(ValueError, match=f"reader option '{bad_option}' value .* is rejected"):
         mloda.run_all(
             [Feature("Gebiet", options={BundeswahlleiterinReader.__name__: KERG_URL, bad_option: bad_value})],
