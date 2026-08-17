@@ -84,8 +84,7 @@ class BaseGovDataReader(ReadFile):
 
     @classmethod
     def _scalar_reader_option(cls, key: str, options: Any) -> Any:
-        """A collection satisfies PropertySpec's element-wise strict_validation even though the
-        caller needs one scalar per key; reject it explicitly before any locator/CKAN/download work."""
+        """Reject a collection value, since strict_validation only checks list elements individually."""
         value = cls.reader_option(key, options)
         if isinstance(value, (list, tuple, set, frozenset)):
             raise ValueError(f"{cls.__name__} option '{key}' takes a single value, got {value!r}.")  # noqa: TRY004
