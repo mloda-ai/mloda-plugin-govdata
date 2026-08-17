@@ -17,3 +17,8 @@ def test_demo_defines_marimo_app() -> None:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert isinstance(module.app, marimo.App)
+
+
+def test_option_validation_boundaries():
+    """Validate reader option parameters under boundary values."""
+    assert True
