@@ -236,6 +236,25 @@ def test_invalid_geometry_option_rejected_before_any_network_call(bad_option: st
         )
 
 
+@pytest.mark.parametrize(
+    ("collection_option", "collection_value"),
+    [
+        (OPTION_WAHL_SKIPROWS, [5, 6]),
+        (OPTION_WAHL_HEADER_ROWS, [3, 4]),
+        (OPTION_WAHL_LABEL_COLUMNS, [4, 5]),
+        (OPTION_WAHL_VALUE_TYPE, ["integer", "float"]),
+    ],
+)
+@respx.mock
+def test_geometry_collection_value_rejected_before_any_network_call(
+    collection_option: str, collection_value: list[Any]
+) -> None:
+    # Each element is valid alone, so strict_validation admits the list; the scalar guard catches it first.
+    options = {BundeswahlleiterinReader.__name__: KERG_URL, collection_option: collection_value}
+    with pytest.raises(ValueError, match="takes a single value"):
+        mloda.run_all([Feature("Gebiet", options=options)], compute_frameworks=["PyArrowTable"])
+
+
 @pytest.mark.live
 def test_berlin_wahl_live_end_to_end() -> None:
     result = mloda.run_all(

@@ -272,13 +272,6 @@ class UbaAirReader(BaseGovDataReader):
         return (".json",)
 
     @classmethod
-    def _scalar_reader_option(cls, key: str, options: Any) -> Any:
-        value = cls.reader_option(key, options)
-        if isinstance(value, (list, tuple, set, frozenset)):
-            raise ValueError(f"{cls.__name__} option '{key}' takes a single value, got {value!r}.")  # noqa: TRY004
-        return value
-
-    @classmethod
     def match_subclass_data_access(cls, data_access: Any, feature_names: list[str], options: Any) -> Any:
         if data_access is not True:
             return None

@@ -83,6 +83,14 @@ class BaseGovDataReader(ReadFile):
         return {field.name: str(field.type) for field in table.schema}
 
     @classmethod
+    def _scalar_reader_option(cls, key: str, options: Any) -> Any:
+        """Reject a collection value, since strict_validation only checks list elements individually."""
+        value = cls.reader_option(key, options)
+        if isinstance(value, (list, tuple, set, frozenset)):
+            raise ValueError(f"{cls.__name__} option '{key}' takes a single value, got {value!r}.")  # noqa: TRY004
+        return value
+
+    @classmethod
     def _coerce_locator(cls, data_access: Any) -> GovDataLocator:
         locator = GovDataLocator.coerce(data_access)
         if locator is None:
