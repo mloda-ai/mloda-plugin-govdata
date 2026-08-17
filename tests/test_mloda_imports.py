@@ -21,3 +21,14 @@ def test_mloda_testing_imports() -> None:
     from mloda.testing.base import FeatureGroupTestBase
 
     assert FeatureGroupTestBase is not None
+
+
+def test_mloda_user_imports() -> None:
+    """Verify mloda.user and its pyarrow backend module import work."""
+    from mloda.user import Feature, Options, mloda
+    from mloda.user.pyarrow import PyArrowTable
+
+    assert Feature is not None
+    assert Options is not None
+    assert mloda is not None
+    assert PyArrowTable is not None

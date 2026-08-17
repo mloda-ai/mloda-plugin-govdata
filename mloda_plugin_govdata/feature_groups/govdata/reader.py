@@ -16,11 +16,8 @@ from typing import Any, ClassVar
 
 import pyarrow as pa
 from mloda.provider import FeatureSet
-
-# PyArrowTable is imported for its registration side effect so "PyArrowTable" resolves; the reader
-# returns a pyarrow Table. Public path since mloda 0.10.0 (lazy export); resolving it imports and
-# registers the framework class.
-from mloda.user import Options, PyArrowTable  # noqa: F401
+from mloda.user import Options
+from mloda.user.pyarrow import PyArrowTable  # noqa: F401
 from mloda_plugins.feature_group.input_data.read_file import ReadFile
 
 from .core.cache import DownloadCache
