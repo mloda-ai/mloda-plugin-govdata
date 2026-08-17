@@ -54,7 +54,7 @@ Got a slug but not the column names? `peek` lists what you can request as featur
 StuttgartPopulationReader.peek(slug)  # {"Stichtag": "date32[day]", "Stadtbezirk": "string", ...}
 ```
 
-It works on every reader (`BundeswahlleiterinReader.peek(kerg)`, `UbaAirReader.peek(url)`) and downloads through the cache, so the actual feature request reuses the file. A typo in a feature name fails with the available columns and a close-match suggestion instead of a raw KeyError.
+It works on every reader (`BundeswahlleiterinReader.peek(kerg)`, `UbaAirReader.peek(uba_measures_url(...))`) and downloads through the cache, so the actual feature request reuses the file. `peek` takes a raw URL, bypassing the `READER_OPTIONS` validation below. A typo in a feature name fails with the available columns and a close-match suggestion instead of a raw KeyError.
 
 The elections reader handles a direct CSV URL whose file has a multi-row merged header (Bundeswahlleiterin `kerg.csv`):
 
