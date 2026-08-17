@@ -245,6 +245,7 @@ def test_invalid_geometry_option_rejected_before_any_network_call(bad_option: st
         (OPTION_WAHL_VALUE_TYPE, ["integer", "float"]),
     ],
 )
+@respx.mock
 def test_geometry_collection_value_rejected_before_any_network_call(
     collection_option: str, collection_value: list[Any]
 ) -> None:

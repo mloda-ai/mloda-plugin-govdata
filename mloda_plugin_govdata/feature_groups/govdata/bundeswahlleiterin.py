@@ -77,7 +77,7 @@ class BundeswahlleiterinReader(BaseGovDataReader):
         locator = super().match_subclass_data_access(data_access, feature_names, options)
         if locator is None:
             return None
-        for key in (OPTION_WAHL_SKIPROWS, OPTION_WAHL_HEADER_ROWS, OPTION_WAHL_LABEL_COLUMNS, OPTION_WAHL_VALUE_TYPE):
+        for key in cls.READER_OPTIONS:
             cls._scalar_reader_option(key, options)
         return locator
 
