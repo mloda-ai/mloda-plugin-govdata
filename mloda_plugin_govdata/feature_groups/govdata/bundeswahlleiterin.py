@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 import pyarrow as pa
+from mloda.provider import PropertySpec
 from mloda.user import Options
 
 from .core.discovery import ResolvedDistribution
@@ -30,19 +32,21 @@ class BundeswahlleiterinReader(BaseGovDataReader):
     configuration step instead of a code change.
     """
 
+    READER_OPTIONS: ClassVar[dict[str, PropertySpec]] = {
+        OPTION_WAHL_SKIPROWS: PropertySpec("Preamble lines to skip before the header block.", default=5),
+        OPTION_WAHL_HEADER_ROWS: PropertySpec("Merged header rows flattened into column names.", default=3),
+        OPTION_WAHL_LABEL_COLUMNS: PropertySpec("Leading columns typed as strings, not value_type.", default=4),
+        OPTION_WAHL_VALUE_TYPE: PropertySpec("ColumnType of the non-label columns.", default=ColumnType.INTEGER),
+    }
+
     @classmethod
     def _parse(
         cls, path: Path, locator: GovDataLocator, distribution: ResolvedDistribution, options: Options | None = None
     ) -> pa.Table:
-        def int_option(key: str, default: int) -> int:
-            value = options.get(key) if options is not None else None
-            return default if value is None else int(value)  # non-numeric values raise loudly
-
-        raw_value_type = options.get(OPTION_WAHL_VALUE_TYPE) if options is not None else None
         return parse_multi_header_csv(
             path,
-            skiprows=int_option(OPTION_WAHL_SKIPROWS, 5),
-            header_rows=int_option(OPTION_WAHL_HEADER_ROWS, 3),
-            label_columns=int_option(OPTION_WAHL_LABEL_COLUMNS, 4),
-            value_type=ColumnType(raw_value_type) if raw_value_type is not None else ColumnType.INTEGER,
+            skiprows=int(cls.reader_option(OPTION_WAHL_SKIPROWS, options)),  # non-numeric values raise loudly
+            header_rows=int(cls.reader_option(OPTION_WAHL_HEADER_ROWS, options)),
+            label_columns=int(cls.reader_option(OPTION_WAHL_LABEL_COLUMNS, options)),
+            value_type=ColumnType(cls.reader_option(OPTION_WAHL_VALUE_TYPE, options)),
         )
