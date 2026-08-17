@@ -54,7 +54,7 @@ Got a slug but not the column names? `peek` lists what you can request as featur
 StuttgartPopulationReader.peek(slug)  # {"Stichtag": "date32[day]", "Stadtbezirk": "string", ...}
 ```
 
-It works on every reader (`BundeswahlleiterinReader.peek(kerg)`, `UbaAirReader.peek(url)`) and downloads through the cache, so the actual feature request reuses the file. A typo in a feature name fails with the available columns and a close-match suggestion instead of a raw KeyError.
+It works on every reader (`BundeswahlleiterinReader.peek(kerg)`, `UbaAirReader.peek(uba_measures_url(...))`) and downloads through the cache, so the actual feature request reuses the file. `peek` takes a raw URL, bypassing the `READER_OPTIONS` validation below. A typo in a feature name fails with the available columns and a close-match suggestion instead of a raw KeyError.
 
 The elections reader handles a direct CSV URL whose file has a multi-row merged header (Bundeswahlleiterin `kerg.csv`):
 
@@ -68,16 +68,30 @@ result = mloda.run_all(
 )
 ```
 
-The environment reader fetches the Umweltbundesamt (UBA) Air Data v4 `measures` endpoint (REST JSON) and flattens it to one typed row per station and timestamp. `uba_measures_url` builds the query (here: hourly ozone at station 143):
+The environment reader fetches the Umweltbundesamt (UBA) Air Data v4 `measures` endpoint (REST JSON) and flattens it to one typed row per station and timestamp. Query parameters are per-feature options, not a pre-built URL (here: hourly ozone at station 143); a bad value is rejected during feature resolution, before any network call:
 
 ```python
-from mloda_plugin_govdata.feature_groups.govdata import UbaAirReader, uba_measures_url
+from mloda_plugin_govdata.feature_groups.govdata import (
+    OPTION_UBA_COMPONENT,
+    OPTION_UBA_DATE_FROM,
+    OPTION_UBA_DATE_TO,
+    OPTION_UBA_SCOPE,
+    OPTION_UBA_STATION,
+    UbaAirReader,
+)
 
-url = uba_measures_url(station=143, component=3, scope=2, date_from="2025-01-01", date_to="2025-01-01")
+uba_options = {
+    UbaAirReader: True,
+    OPTION_UBA_STATION: 143,
+    OPTION_UBA_COMPONENT: 3,
+    OPTION_UBA_SCOPE: 2,
+    OPTION_UBA_DATE_FROM: "2025-01-01",
+    OPTION_UBA_DATE_TO: "2025-01-01",
+}
 result = mloda.run_all(
     [
-        Feature("date_start", options={UbaAirReader: url}),
-        Feature("value", options={UbaAirReader: url}),
+        Feature("date_start", options=uba_options),
+        Feature("value", options=uba_options),
     ],
     compute_frameworks=["PyArrowTable"],
 )

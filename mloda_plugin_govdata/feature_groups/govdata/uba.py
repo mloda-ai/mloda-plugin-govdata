@@ -11,12 +11,15 @@ position and uses the self-describing ``indices.data`` block only to detect a ch
 from __future__ import annotations
 
 import json
+import numbers
 import os
+from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import urlencode
 
 import pyarrow as pa
+from mloda.provider import PropertySpec, is_positive_int
 from mloda.user import Options
 
 from .core.discovery import ResolvedDistribution
@@ -25,6 +28,34 @@ from .core.parse import ColumnType
 from .reader import BaseGovDataReader
 
 UBA_AIR_BASE = "https://luftdaten.umweltbundesamt.de/api/air-data/v4"
+
+OPTION_UBA_STATION = "govdata_uba_station"
+OPTION_UBA_COMPONENT = "govdata_uba_component"
+OPTION_UBA_SCOPE = "govdata_uba_scope"
+OPTION_UBA_DATE_FROM = "govdata_uba_date_from"
+OPTION_UBA_DATE_TO = "govdata_uba_date_to"
+OPTION_UBA_TIME_FROM = "govdata_uba_time_from"
+OPTION_UBA_TIME_TO = "govdata_uba_time_to"
+OPTION_UBA_LANG = "govdata_uba_lang"
+
+
+def _is_hour_slot(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, numbers.Integral):
+        return 1 <= int(value) <= 24
+    return isinstance(value, str) and value.isdecimal() and 1 <= int(value) <= 24
+
+
+def _is_iso_date(value: Any) -> bool:
+    if not isinstance(value, str) or len(value) != 10 or value[4] != "-" or value[7] != "-":
+        return False
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
 
 # Canonical, stable output schema. The v4 measures leaf array is fixed by the API contract as
 # [component id, scope id, value, date end, index]; the outer keys prepend the station id and the
@@ -201,17 +232,75 @@ def parse_uba_measures(path: str | os.PathLike[str]) -> pa.Table:
 
 
 class UbaAirReader(BaseGovDataReader):
-    """Reads the UBA Air Data v4 ``measures`` JSON endpoint into a typed Arrow table.
+    """Reads the UBA Air Data v4 ``measures`` endpoint into a typed Arrow table.
 
-    The option value is a full ``measures`` URL (build one with :func:`uba_measures_url`);
-    the response is flattened to one row per station and measurement timestamp. Reuses the
-    client, cache, retry, and direct-URL resolution; only the parse seam differs from the
+    Query parameters are per-feature ``OPTION_UBA_*`` options, not a pre-built URL. The response
+    is flattened to one row per station and measurement timestamp. Reuses the client, cache,
+    retry, and direct-URL resolution; only the parse seam and locator building differ from the
     CSV readers.
     """
+
+    READER_OPTIONS: ClassVar[dict[str, PropertySpec]] = {
+        OPTION_UBA_STATION: PropertySpec("UBA station id.", strict_validation=True, element_validator=is_positive_int),
+        OPTION_UBA_COMPONENT: PropertySpec(
+            "UBA component id (see the UBA components endpoint).",
+            strict_validation=True,
+            element_validator=is_positive_int,
+        ),
+        OPTION_UBA_SCOPE: PropertySpec(
+            "UBA scope id (see the UBA scopes endpoint).",
+            strict_validation=True,
+            element_validator=is_positive_int,
+        ),
+        OPTION_UBA_DATE_FROM: PropertySpec(
+            "Query window start, YYYY-MM-DD.", strict_validation=True, element_validator=_is_iso_date
+        ),
+        OPTION_UBA_DATE_TO: PropertySpec(
+            "Query window end, YYYY-MM-DD.", strict_validation=True, element_validator=_is_iso_date
+        ),
+        OPTION_UBA_TIME_FROM: PropertySpec(
+            "Start hour slot (1-24).", default=1, strict_validation=True, element_validator=_is_hour_slot
+        ),
+        OPTION_UBA_TIME_TO: PropertySpec(
+            "End hour slot (1-24).", default=24, strict_validation=True, element_validator=_is_hour_slot
+        ),
+        OPTION_UBA_LANG: PropertySpec("UBA API response language.", default="en"),
+    }
 
     @classmethod
     def suffix(cls) -> tuple[str, ...]:
         return (".json",)
+
+    @classmethod
+    def _scalar_reader_option(cls, key: str, options: Any) -> Any:
+        value = cls.reader_option(key, options)
+        if isinstance(value, (list, tuple, set, frozenset)):
+            raise ValueError(f"{cls.__name__} option '{key}' takes a single value, got {value!r}.")  # noqa: TRY004
+        return value
+
+    @classmethod
+    def match_subclass_data_access(cls, data_access: Any, feature_names: list[str], options: Any) -> Any:
+        if data_access is not True:
+            return None
+        date_from = cls._scalar_reader_option(OPTION_UBA_DATE_FROM, options)
+        date_to = cls._scalar_reader_option(OPTION_UBA_DATE_TO, options)
+        if date_from > date_to:
+            raise ValueError(f"{cls.__name__}: date_from {date_from!r} is after date_to {date_to!r}.")
+        time_from = cls._scalar_reader_option(OPTION_UBA_TIME_FROM, options)
+        time_to = cls._scalar_reader_option(OPTION_UBA_TIME_TO, options)
+        if int(time_from) > int(time_to):
+            raise ValueError(f"{cls.__name__}: time_from {time_from!r} is after time_to {time_to!r}.")
+        url = uba_measures_url(
+            station=cls._scalar_reader_option(OPTION_UBA_STATION, options),
+            component=cls._scalar_reader_option(OPTION_UBA_COMPONENT, options),
+            scope=cls._scalar_reader_option(OPTION_UBA_SCOPE, options),
+            date_from=date_from,
+            date_to=date_to,
+            time_from=time_from,
+            time_to=time_to,
+            lang=cls._scalar_reader_option(OPTION_UBA_LANG, options),
+        )
+        return GovDataLocator(distribution_url=url)
 
     @classmethod
     def _parse(

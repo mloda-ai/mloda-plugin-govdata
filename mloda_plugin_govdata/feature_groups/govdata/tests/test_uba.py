@@ -1,6 +1,7 @@
 """Tests for the UBA Air Data reader: Level 1 (flatten / URL), Level 2 (recorded), Level 3 (live)."""
 
 import json
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,14 @@ from hypothesis import strategies as st
 from mloda.user import Feature, mloda
 
 from mloda_plugin_govdata.feature_groups.govdata.uba import (
+    OPTION_UBA_COMPONENT,
+    OPTION_UBA_DATE_FROM,
+    OPTION_UBA_DATE_TO,
+    OPTION_UBA_LANG,
+    OPTION_UBA_SCOPE,
+    OPTION_UBA_STATION,
+    OPTION_UBA_TIME_FROM,
+    OPTION_UBA_TIME_TO,
     UBA_AIR_BASE,
     UbaAirReader,
     parse_uba_measures_bytes,
@@ -25,6 +34,17 @@ INDICES = {"data": {"station id": {"date start": ["component id", "scope id", "v
 
 def _demo_url() -> str:
     return uba_measures_url(station=143, component=3, scope=2, date_from="2025-01-01", date_to="2025-01-01")
+
+
+def _demo_options() -> dict[str, Any]:
+    return {
+        UbaAirReader.__name__: True,
+        OPTION_UBA_STATION: 143,
+        OPTION_UBA_COMPONENT: 3,
+        OPTION_UBA_SCOPE: 2,
+        OPTION_UBA_DATE_FROM: "2025-01-01",
+        OPTION_UBA_DATE_TO: "2025-01-01",
+    }
 
 
 # --- Level 1: URL builder ---------------------------------------------------------------
@@ -161,13 +181,12 @@ def test_flatten_row_count_matches_leaves(stations: dict[str, dict[str, list[Any
 def test_uba_reader_level2(fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(UbaAirReader, "cache_dir", str(tmp_path))
     measures_bytes = (fixtures_dir / "uba_measures.json").read_bytes()
-    url = _demo_url()
-    respx.get(url).mock(return_value=httpx.Response(200, content=measures_bytes))
+    respx.get(_demo_url()).mock(return_value=httpx.Response(200, content=measures_bytes))
 
     result = mloda.run_all(
         [
-            Feature("value", options={UbaAirReader.__name__: url}),
-            Feature("date_start", options={UbaAirReader.__name__: url}),
+            Feature("value", options=dict(_demo_options())),
+            Feature("date_start", options=dict(_demo_options())),
         ],
         compute_frameworks=["PyArrowTable"],
     )
@@ -178,14 +197,103 @@ def test_uba_reader_level2(fixtures_dir: Path, tmp_path: Path, monkeypatch: pyte
     assert table.column("value").to_pylist()[0] == 37.0
 
 
+@respx.mock
+def test_uba_reader_level2_with_non_default_time_and_lang(
+    fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(UbaAirReader, "cache_dir", str(tmp_path))
+    measures_bytes = (fixtures_dir / "uba_measures.json").read_bytes()
+    url = uba_measures_url(
+        station=143, component=3, scope=2, date_from="2025-01-01", date_to="2025-01-01", time_from=6, lang="de"
+    )
+    respx.get(url).mock(return_value=httpx.Response(200, content=measures_bytes))
+
+    options = dict(_demo_options())
+    options[OPTION_UBA_TIME_FROM] = 6
+    options[OPTION_UBA_LANG] = "de"
+    result = mloda.run_all([Feature("value", options=options)], compute_frameworks=["PyArrowTable"])
+    assert result[0].num_rows == 24
+
+
+# --- Level 2: strict validation at resolution time (no network) -------------------------
+
+
+@pytest.mark.parametrize(
+    ("bad_option", "bad_value"),
+    [
+        (OPTION_UBA_STATION, -1),
+        (OPTION_UBA_COMPONENT, 0),
+        (OPTION_UBA_SCOPE, "not-a-number"),
+        (OPTION_UBA_DATE_FROM, "2025-13-40"),
+        (OPTION_UBA_DATE_FROM, "20250101"),
+        (OPTION_UBA_DATE_FROM, "2025-W01-1"),
+        (OPTION_UBA_DATE_TO, "not-a-date"),
+        (OPTION_UBA_DATE_TO, date(2025, 1, 1)),
+        (OPTION_UBA_TIME_FROM, 0),
+        (OPTION_UBA_TIME_TO, 25),
+    ],
+)
+@respx.mock
+def test_invalid_uba_option_rejected_before_any_network_call(bad_option: str, bad_value: Any) -> None:
+    options = dict(_demo_options())
+    options[bad_option] = bad_value
+    with pytest.raises(ValueError, match=f"reader option '{bad_option}' value .* is rejected"):
+        mloda.run_all([Feature("value", options=options)], compute_frameworks=["PyArrowTable"])
+
+
+@respx.mock
+def test_missing_required_uba_option_rejected_before_any_network_call() -> None:
+    options = dict(_demo_options())
+    del options[OPTION_UBA_DATE_FROM]
+    with pytest.raises(ValueError, match="required reader option 'govdata_uba_date_from' is absent"):
+        mloda.run_all([Feature("value", options=options)], compute_frameworks=["PyArrowTable"])
+
+
+@respx.mock
+def test_station_collection_value_rejected_before_any_network_call() -> None:
+    options = dict(_demo_options())
+    options[OPTION_UBA_STATION] = [143, 144]
+    with pytest.raises(ValueError, match="takes a single value"):
+        mloda.run_all([Feature("value", options=options)], compute_frameworks=["PyArrowTable"])
+
+
+@respx.mock
+def test_inverted_date_window_rejected_before_any_network_call() -> None:
+    options = dict(_demo_options())
+    options[OPTION_UBA_DATE_FROM] = "2025-12-31"
+    with pytest.raises(ValueError, match="date_from .* is after date_to"):
+        mloda.run_all([Feature("value", options=options)], compute_frameworks=["PyArrowTable"])
+
+
+@respx.mock
+def test_inverted_time_window_rejected_before_any_network_call() -> None:
+    options = dict(_demo_options())
+    options[OPTION_UBA_TIME_FROM] = 20
+    options[OPTION_UBA_TIME_TO] = 5
+    with pytest.raises(ValueError, match="time_from .* is after time_to"):
+        mloda.run_all([Feature("value", options=options)], compute_frameworks=["PyArrowTable"])
+
+
+@respx.mock
+def test_explicit_time_boundaries_accepted(fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(UbaAirReader, "cache_dir", str(tmp_path))
+    measures_bytes = (fixtures_dir / "uba_measures.json").read_bytes()
+    respx.get(_demo_url()).mock(return_value=httpx.Response(200, content=measures_bytes))
+
+    options = dict(_demo_options())
+    options[OPTION_UBA_TIME_FROM] = 1
+    options[OPTION_UBA_TIME_TO] = 24
+    result = mloda.run_all([Feature("value", options=options)], compute_frameworks=["PyArrowTable"])
+    assert result[0].num_rows == 24
+
+
 # --- Level 3: live (deselected by default) ----------------------------------------------
 
 
 @pytest.mark.live
 def test_uba_live_end_to_end() -> None:
-    url = _demo_url()
     result = mloda.run_all(
-        [Feature("value", options={UbaAirReader.__name__: url})],
+        [Feature("value", options=dict(_demo_options()))],
         compute_frameworks=["PyArrowTable"],
     )
     table = result[0]
