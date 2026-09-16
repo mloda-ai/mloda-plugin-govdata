@@ -1,4 +1,4 @@
-Copyright 2026- Tom Kaltofen <tomkaltofen@gmail.com>
+Copyright 2026- Tom Kaltofen <tomkaltofen@mloda.ai>
 
 This project, "mloda-plugin-govdata," is licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License. You may obtain a copy
