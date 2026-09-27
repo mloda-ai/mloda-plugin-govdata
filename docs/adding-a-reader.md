@@ -12,7 +12,7 @@ To connect a new dataset:
 2. For a different payload shape, subclass `BaseGovDataReader[GovDataLocator]` and implement `_parse`; `bundeswahlleiterin.py` and `uba.py` show the pattern. For a source with its own locator type, also override `locator_type()` and `_fetch`; the Destatis path below shows a POST source with credentials.
 3. Keep source-specific parse logic in the source's module as a `parse_*_bytes` function plus a path wrapper, like `uba.py`. Generic parsing belongs in `core/parse.py`. That keeps it testable from fixture files without network access.
 4. Add tests in the `tests/` package next to the module (`feature_groups/govdata/tests/`, `feature_groups/destatis/tests/`) with a small real sample in its `fixtures/`, and record the sample's source and license in the `NOTICE` there.
-5. Export the reader from the package `__init__.py` and add a usage snippet to the README.
+5. Export the reader from the package `__init__.py` and add a usage snippet to [readers.md](readers.md).
 6. Run `tox` (pytest, ruff, mypy strict, bandit); it must pass before a PR.
 
 ## The Destatis path: a POST source with credentials
