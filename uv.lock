@@ -688,10 +688,10 @@ wheels = [
 
 [[package]]
 name = "mloda"
-version = "0.13.0"
+version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f8/e8/e47ceae4da7ee3c320fe594ecc189877bcd8f916e19defad914157cdeea3/mloda-0.13.0-py3-none-any.whl", hash = "sha256:7046ee765b78d608b4f9379e1e008abb72a8551537a4e495462384ee06860401", size = 570613, upload-time = "2026-09-14T08:31:40.089Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/c3/cf2567d0c4f78ad7d3ea6c30efe67e5eb1e14e63e12d8009c6baa136f3ef/mloda-0.14.0-py3-none-any.whl", hash = "sha256:783313ed9cda0c25619085f4ce9e34eb3eec78425895963a6328ddf5d1045eb7", size = 599228, upload-time = "2026-09-24T11:20:23.5Z" },
 ]
 
 [[package]]
@@ -758,15 +758,14 @@ provides-extras = ["demo", "dev"]
 
 [[package]]
 name = "mloda-testing"
-version = "0.4.7"
+version = "0.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mloda" },
-    { name = "pyarrow" },
     { name = "pytest" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c6/61/56b91068b5af82cf301d468668d57c12e6aa1dd2e13795da749652faa863/mloda_testing-0.4.7-py3-none-any.whl", hash = "sha256:5c5ec25fe8f0db008b8e858a77457c9e9709d5668c00f5d25e4c7543e5091c41", size = 155022, upload-time = "2026-09-16T15:16:31.314Z" },
+    { url = "https://files.pythonhosted.org/packages/05/22/e8d25f5291c24cf9cc3add81516b19e1e4aeef29231f9f32ccf107e428d0/mloda_testing-0.3.2-py3-none-any.whl", hash = "sha256:f20db2d425d3c0372d15d5bd1a9b13d3d3769e37343124c6548a5cb848f5b911", size = 81356, upload-time = "2026-05-17T17:19:24.04Z" },
 ]
 
 [[package]]
