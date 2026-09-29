@@ -50,7 +50,6 @@ class LandPopulationPerVoter(FeatureGroup):
         return {cls.NAME}
 
     def input_features(self, options: Options, feature_name: FeatureName) -> set[Feature] | None:
-        # One side is enough: mloda 0.14.0 registers a Feature's link before its siblings (mloda-ai/mloda#1435).
         return {
             Feature("value", options={DestatisReader.__name__: LAND_LOCATOR}, link=LAND_LINK),
             Feature(VOTERS, options={BundeswahlleiterinReader.__name__: KERG_URL}),
