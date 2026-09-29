@@ -164,7 +164,9 @@ def test_an_unknown_part_is_refused_before_any_fetch_naming_the_parts(
     ]
     for feature in features:
         with pytest.raises(
-            FeatureResolutionError, match=r"unknown part ~edition; KreisRebaseFeature returns ~key.*~provenance"
+            FeatureResolutionError,
+            match=r"KreisRebaseFeature \(feature name\): unknown part ~edition; "
+            r"KreisRebaseFeature returns ~key.*~provenance",
         ):
             _run([feature])
     assert route.calls.call_count == 0

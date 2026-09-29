@@ -14,7 +14,7 @@ from typing import Any, ClassVar, Generic, TypeVar, cast
 
 import pyarrow as pa
 from mloda.provider import FeatureSet
-from mloda.user import Options
+from mloda.user import DataType, Options
 from mloda.user.pyarrow import PyArrowTable  # noqa: F401
 from mloda_plugins.feature_group.input_data.read_file import ReadFile
 
@@ -95,6 +95,23 @@ class BaseGovDataReader(ReadFile, Generic[LocatorT]):
         """
         table = cls._read_table(cls._coerce_locator(data_access))
         return {field.name: str(field.type) for field in table.schema}
+
+    @classmethod
+    def describe_columns(cls, data_access: Any) -> dict[str, DataType | None]:
+        """``peek`` as mloda's column discovery (lineage extenders call it); downloads through the cache too."""
+        table = cls._read_table(cls._coerce_locator(data_access))
+        return {field.name: DataType.from_arrow_type_safe(field.type) for field in table.schema}
+
+    @classmethod
+    def data_access_identity(cls, data_access: Any) -> str:
+        """The dataset name in lineage and audit records: the locator label, a URL cut to scheme, host and path.
+
+        mloda's default names every locator by its type alone. The selection (years, keys, a URL query) is left out.
+        """
+        if not isinstance(data_access, cls.locator_type()):
+            return super().data_access_identity(data_access)
+        label = data_access.describe()
+        return super().data_access_identity(label) if label.startswith(("http://", "https://")) else label
 
     @classmethod
     def _scalar_reader_option(cls, key: str, options: Any) -> Any:

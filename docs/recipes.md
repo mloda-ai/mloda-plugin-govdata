@@ -110,7 +110,7 @@ the same columns, iterate `result.frames()` instead. Check the Land names on eac
 `feature_groups.harmonization.core.land_codes.check_land_names`. The links block lets a consumer
 FeatureGroup that needs a column from each side join them instead (mloda executes a join only for such a
 consumer); `feature_groups.land_population_per_voter.LandPopulationPerVoter` is one, computing population
-per voter; it carries the same link on both inputs, so it also runs without `links=`.
+per voter; its population input carries the link, so it also runs without `links=`.
 A `-` in a GENESIS cell arrives as 0 with the sign kept in
 `value_marker`; only the harmonization step, which knows the validity windows, turns it into not applicable,
 so a consumer of raw columns reads the marker before taking a 0 as a count. Each recipe except

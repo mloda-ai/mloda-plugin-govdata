@@ -12,8 +12,7 @@ readme = "README.md"
 license = "Apache-2.0"
 authors = [{ name = "Tom Kaltofen", email = "tomkaltofen@mloda.ai" }]
 dependencies = [
-    "mloda>=0.13.0,<0.15.0",
-    "mloda-testing>=0.3.1",
+    "mloda>=0.14.0,<0.15.0",
     "filelock>=3.12",
     "httpx>=0.27",
     "openpyxl>=3.1",
@@ -34,6 +33,7 @@ Releases = "https://github.com/mloda-ai/mloda-plugin-govdata/releases"
 [project.optional-dependencies]
 demo = ["marimo>=0.14"]
 dev = [
+    "mloda-testing>=0.5.0",
     "tox",
     "tox-uv",
     "uv>=0.11.15",

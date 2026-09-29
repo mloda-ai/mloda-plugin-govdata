@@ -46,7 +46,7 @@ with build_client() as client:
 StuttgartPopulationReader.peek(slug)  # {"Stichtag": "date32[day]", "Stadtbezirk": "string", ...}
 ```
 
-It works on every reader (`BundeswahlleiterinReader.peek(kerg)`, `UbaAirReader.peek(uba_measures_url(...))`, `DestatisReader.peek(...)`) and downloads through the cache, so the actual feature request reuses the file. `peek` takes a raw URL, bypassing the `READER_OPTIONS` validation. A typo in a feature name fails with the available columns and a close-match suggestion.
+It works on every reader (`BundeswahlleiterinReader.peek(kerg)`, `UbaAirReader.peek(uba_measures_url(...))`, `DestatisReader.peek(...)`) and downloads through the cache, so the actual feature request reuses the file. `peek` takes a raw URL, bypassing the `READER_OPTIONS` validation. `describe_columns` returns the same columns with mloda `DataType`s, the form lineage extenders read. A typo in a feature name fails with the available columns and a close-match suggestion.
 
 ## Elections (Bundeswahlleiterin)
 

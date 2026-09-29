@@ -155,6 +155,18 @@ def test_peek_without_credentials_raises_on_a_cache_miss(tmp_path: Path, monkeyp
     assert respx.calls.call_count == 0
 
 
+@pytest.mark.parametrize(
+    ("locator", "identity"),
+    [
+        (DestatisLocator(TABLE_CODE), TABLE_CODE),
+        (DestatisLocator(TABLE_CODE, regionalkey=("01",), startyear=2020), TABLE_CODE),  # the selection is left out
+        (DestatisLocator("13211-02-05-4", host="regionalstatistik"), "13211-02-05-4@regionalstatistik"),
+    ],
+)
+def test_data_access_identity_is_the_table_code(locator: DestatisLocator, identity: str) -> None:
+    assert DestatisReader.data_access_identity(locator) == identity
+
+
 @respx.mock
 def test_explicit_credentials_from_options_are_used_over_env(
     fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

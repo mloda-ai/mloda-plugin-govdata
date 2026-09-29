@@ -2,12 +2,14 @@
 name mapping. ``LandPopulationPerVoter`` is the consumer FeatureGroup mloda's join fires for."""
 
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pyarrow as pa
 import pytest
 import respx
-from mloda.user import Feature, FeatureName, Options, PluginCollector, mloda
+from mloda.steward import Extender, ExtenderHook, HookContext
+from mloda.user import Feature, PluginCollector, mloda
 
 from mloda_plugin_govdata.feature_groups.destatis import DestatisReader, parse_ffcsv_zip
 from mloda_plugin_govdata.feature_groups.destatis.core.hosts import GENESIS_ONLINE
@@ -15,7 +17,7 @@ from mloda_plugin_govdata.feature_groups.govdata import BundeswahlleiterinReader
 from mloda_plugin_govdata.feature_groups.harmonization.core.land_codes import check_land_names
 from mloda_plugin_govdata.feature_groups.land_population_per_voter import (
     KERG_URL,
-    LAND_LINK,
+    LAND_LOCATOR,
     PARTS,
     VOTERS,
     LandPopulationPerVoter,
@@ -40,12 +42,6 @@ def _mock_both_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     respx.get(KERG_URL).mock(
         return_value=httpx.Response(200, content=KERG_SAMPLE.read_bytes(), headers={"ETag": '"k1"'})
     )
-
-
-def test_both_inputs_carry_the_link() -> None:
-    features = LandPopulationPerVoter().input_features(Options(), FeatureName(LandPopulationPerVoter.NAME))
-    assert features is not None
-    assert [feature.link for feature in features] == [LAND_LINK, LAND_LINK]
 
 
 def test_land_keys_line_up_without_name_mapping() -> None:
@@ -99,3 +95,35 @@ def test_land_join_through_mloda(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     check_land_names(zip(codes, table.column(f"{LandPopulationPerVoter.NAME}~land").to_pylist()))
     actual = dict(zip(codes, table.column(f"{LandPopulationPerVoter.NAME}~value").to_pylist()))
     assert actual == pytest.approx(_expected_ratios())
+
+
+class _LoadIdentities(Extender):
+    """Records the name each data load hands to extenders (lineage, audit, tracing), per reader."""
+
+    def __init__(self) -> None:
+        self.seen: dict[str | None, str | None] = {}
+
+    def wraps(self) -> set[ExtenderHook]:
+        return {ExtenderHook.INPUT_DATA_LOAD}
+
+    def __call__(self, func: Any, *args: Any, **kwargs: Any) -> Any:
+        context = HookContext.current()
+        assert context is not None
+        self.seen[context.data_access_format] = context.data_access_identity
+        return func(*args, **kwargs)
+
+
+@respx.mock
+def test_each_source_keeps_its_own_name_for_extenders(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _mock_both_sources(tmp_path, monkeypatch)
+    recorder = _LoadIdentities()
+
+    mloda.run_all(
+        [Feature(LandPopulationPerVoter.NAME)],
+        compute_frameworks=["PyArrowTable"],
+        plugin_collector=PluginCollector.enabled_feature_groups({GovDataFeature, LandPopulationPerVoter}),
+        function_extender={recorder},
+    )
+
+    # mloda's default would name both loads by their locator type alone.
+    assert recorder.seen == {DestatisReader.__name__: LAND_LOCATOR["name"], BundeswahlleiterinReader.__name__: KERG_URL}

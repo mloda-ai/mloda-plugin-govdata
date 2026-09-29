@@ -36,7 +36,7 @@ class LandPopulationPerVoter(FeatureGroup):
     Pinned to one GENESIS-Online table and one kerg file (``LAND_LOCATOR``, ``KERG_URL``); not
     parameterized by year or election. One row per Land, sorted by AGS-2 code: ``~code``, ``~land``
     (the name, from ``harmonization.core.land_codes``), ``~population``, ``~voters``, and the computed
-    ``~value``. Both inputs carry ``LAND_LINK``, so ``mloda.run_all`` needs no ``links=`` for it.
+    ``~value``. The population input carries ``LAND_LINK``, so ``mloda.run_all`` needs no ``links=`` for it.
     """
 
     NAME: ClassVar[str] = "land_population_per_voter"
@@ -50,11 +50,10 @@ class LandPopulationPerVoter(FeatureGroup):
         return {cls.NAME}
 
     def input_features(self, options: Options, feature_name: FeatureName) -> set[Feature] | None:
-        # Link on both sides: mloda 0.13.0 registers a Feature's link only when it reaches that Feature, so a
-        # sibling processed first would miss its join key (fixed upstream after 0.13.0 in mloda-ai/mloda#1435).
+        # One side is enough: mloda 0.14.0 registers a Feature's link before its siblings (mloda-ai/mloda#1435).
         return {
             Feature("value", options={DestatisReader.__name__: LAND_LOCATOR}, link=LAND_LINK),
-            Feature(VOTERS, options={BundeswahlleiterinReader.__name__: KERG_URL}, link=LAND_LINK),
+            Feature(VOTERS, options={BundeswahlleiterinReader.__name__: KERG_URL}),
         }
 
     @classmethod

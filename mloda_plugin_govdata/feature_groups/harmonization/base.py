@@ -7,6 +7,7 @@ from typing import Any, ClassVar
 
 from mloda.provider import (
     COLUMN_SEPARATOR,
+    NAME_STAGE,
     ComputeFramework,
     FeatureChainParserMixin,
     FeatureGroup,
@@ -55,7 +56,8 @@ class HarmonizationFeature(FeatureChainParserMixin, FeatureGroup):
         if not cls.PARTS or trailing is None or trailing.group(1) in cls.PARTS:
             return True
         parts = ", ".join(f"~{part}" for part in cls.PARTS)
-        record_match_rejection(cls.__name__, f"unknown part ~{trailing.group(1)}; {cls.__name__} returns {parts}")
+        reason = f"unknown part ~{trailing.group(1)}; {cls.__name__} returns {parts}"
+        record_match_rejection(cls.__name__, reason, stage=NAME_STAGE)
         return False
 
     @classmethod

@@ -12,7 +12,10 @@ _L = TypeVar("_L", bound="Locator")
 
 @runtime_checkable
 class Locator(Protocol):
-    """What a reader needs from its locator type: coercion from an option value and a label for messages."""
+    """What a reader needs from its locator type: coercion from an option value and a label.
+
+    The label names the dataset in messages and in lineage and audit records, so it never carries a credential.
+    """
 
     # PYI019 wants `Self`, which is 3.11+; the package floor is 3.10.
     @classmethod

@@ -12,7 +12,7 @@ import pyarrow as pa
 import pytest
 import respx
 from mloda.provider import FeatureSet
-from mloda.user import Feature, FeatureName, Options, mloda
+from mloda.user import DataType, Feature, FeatureName, Options, mloda
 from mloda_plugins.feature_group.input_data.read_file import ReadFile
 
 from mloda_plugin_govdata.feature_groups.govdata.bundeswahlleiterin import (
@@ -361,6 +361,40 @@ def test_peek_uba_level2(fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest
 def test_peek_rejects_unusable_data_access() -> None:
     with pytest.raises(ValueError, match="cannot handle data access"):
         GovDataReader.peek(123)
+
+
+@respx.mock
+def test_describe_columns_types_what_peek_lists(
+    fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(StuttgartPopulationReader, "cache_dir", str(tmp_path))
+    _mock_population_endpoints(fixtures_dir)
+    assert StuttgartPopulationReader.describe_columns(SLUG) == {
+        "Stichtag": DataType.DATE,
+        "Stadtbezirk": DataType.STRING,
+        "Alter in 10 Gruppen": DataType.STRING,
+        "Einwohner": DataType.INT64,
+    }
+
+
+@pytest.mark.parametrize(
+    ("reader", "data_access", "identity"),
+    [
+        (GovDataReader, GovDataLocator(dataset_id=SLUG), SLUG),
+        (BundeswahlleiterinReader, GovDataLocator.from_string(KERG_URL), KERG_URL),
+        (
+            GovDataReader,
+            GovDataLocator(distribution_url="https://u:p@example.org/a.csv?token=t#f"),
+            "https://example.org/a.csv",
+        ),
+        (FakeReader, _FakeLocator("x"), "fake:x"),
+        (GovDataReader, 123, "int"),  # not a locator: mloda's default
+    ],
+)
+def test_data_access_identity_names_the_dataset_never_a_url_query(
+    reader: type[BaseGovDataReader[Any]], data_access: object, identity: str
+) -> None:
+    assert reader.data_access_identity(data_access) == identity
 
 
 @pytest.mark.parametrize(
