@@ -97,7 +97,7 @@ def test_genesis_labels_over_a_plain_csv_need_the_group_scope(tmp_path: Path, mo
 def test_a_date_inside_the_year_is_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, govdata_fixtures_dir: Path
 ) -> None:
-    # The Stuttgart Stichtag is 30 June: which year it joins to is the open snapshot-to-annual policy.
+    # The Stuttgart Stichtag is 30 June: which year it joins to is chosen by a join, not by this group.
     monkeypatch.setattr(StuttgartPopulationReader, "cache_dir", str(tmp_path))
     package_show = (govdata_fixtures_dir / "package_show.json").read_text(encoding="utf-8")
     distribution_url = json.loads(package_show)["result"]["resources"][0]["url"]

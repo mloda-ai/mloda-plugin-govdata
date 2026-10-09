@@ -3,6 +3,7 @@ only when a consumer needs a column from each side."""
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, ClassVar
 
 import pyarrow as pa
@@ -11,13 +12,17 @@ from mloda.provider import ComputeFramework, FeatureGroup, FeatureSet
 from mloda.user import Feature, FeatureName, JoinSpec, Link, Options
 from mloda.user.pyarrow import PyArrowTable
 
+from .destatis.core.period import stichtag_period
 from .destatis.reader import DestatisReader
 from .govdata.bundeswahlleiterin import BundeswahlleiterinReader
 from .govdata.feature import GovDataFeature
 from .harmonization.core.land_codes import land_name
 
-# GENESIS-Online 12411-0010 (Bevölkerung nach Ländern), 2024; Bundestagswahl 2025 (btw25) kerg.csv.
-LAND_LOCATOR = {"name": "12411-0010", "startyear": 2024, "endyear": 2024}
+# GENESIS-Online 12411-0010 (Bevölkerung nach Ländern) at the last Stichtag on or before the
+# Bundestagswahl 2025 (btw25) election day, joined with its kerg.csv.
+BTW25_ELECTION_DATE = date(2025, 2, 23)
+LAND_YEAR = stichtag_period(BTW25_ELECTION_DATE).start.year
+LAND_LOCATOR = {"name": "12411-0010", "startyear": LAND_YEAR, "endyear": LAND_YEAR}
 KERG_URL = "https://www.bundeswahlleiterin.de/bundestagswahlen/2025/ergebnisse/opendata/btw25/csv/kerg.csv"
 VOTERS = "Wahlberechtigte Erststimmen Endgültig"
 PARTS: tuple[str, ...] = ("code", "land", "population", "voters", "value")

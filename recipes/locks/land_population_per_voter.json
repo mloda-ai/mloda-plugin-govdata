@@ -7,6 +7,7 @@
       "feature_names": [
         "1_variable_attribute_code",
         "1_variable_attribute_label",
+        "time",
         "value",
         "value_marker"
       ],
@@ -44,6 +45,7 @@
     "Nr",
     "Wahlberechtigte Erststimmen Endg\u00fcltig",
     "geh\u00f6rt zu",
+    "time",
     "value",
     "value_marker"
   ],

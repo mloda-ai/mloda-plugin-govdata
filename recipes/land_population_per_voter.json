@@ -21,6 +21,16 @@
       }
     },
     {
+      "name": "time",
+      "options": {
+        "DestatisReader": {
+          "name": "12411-0010",
+          "startyear": 2024,
+          "endyear": 2024
+        }
+      }
+    },
+    {
       "name": "value",
       "options": {
         "DestatisReader": {
@@ -127,6 +137,6 @@
         "credential_env": []
       }
     ],
-    "notes": "Population per eligible voter by Land. The kerg Land rows (gehört zu = 99) carry the AGS-2 in Nr, which equals the Destatis DLAND code, so the join needs no name mapping; check the names on both sides with mloda_plugin_govdata.feature_groups.harmonization.core.land_codes. A party column is empty where the party was not on the ballot (the CSU outside Bayern), which is not a zero. The links block lets a consumer FeatureGroup needing a column from each side join them (mloda_plugin_govdata.feature_groups.land_population_per_voter.LandPopulationPerVoter is one); requesting this recipe's own raw features returns them unjoined, one frame per source. kerg.csv re-fetched on 2026-09-12: unchanged since the first capture."
+    "notes": "Population per eligible voter by Land. Join year: an election joins the last Destatis Stichtag on or before its date, so the Bundestagswahl of 23.02.2025 joins the population of 31.12.2024 (time = 2024). The kerg Land rows (gehört zu = 99) carry the AGS-2 in Nr, which equals the Destatis DLAND code, so the join needs no name mapping; check the names on both sides with mloda_plugin_govdata.feature_groups.harmonization.core.land_codes. A party column is empty where the party was not on the ballot (the CSU outside Bayern), which is not a zero. The links block lets a consumer FeatureGroup needing a column from each side join them (mloda_plugin_govdata.feature_groups.land_population_per_voter.LandPopulationPerVoter is one); requesting this recipe's own raw features returns them unjoined, one frame per source. kerg.csv re-fetched on 2026-09-12: unchanged since the first capture."
   }
 }

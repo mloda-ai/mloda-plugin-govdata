@@ -33,7 +33,12 @@ from mloda_plugin_govdata.feature_groups.govdata import (
 from mloda_plugin_govdata.feature_groups.govdata.core.discovery import CC_BY_4_0, DL_DE_BY_2_0
 from mloda_plugin_govdata.feature_groups.govdata.uba import UBA_LICENSE
 from mloda_plugin_govdata.feature_groups.harmonization.core.reference.sources import BBSR_KREISE
-from mloda_plugin_govdata.feature_groups.land_population_per_voter import LAND_LINK
+from mloda_plugin_govdata.feature_groups.land_population_per_voter import (
+    BTW25_ELECTION_DATE,
+    LAND_LINK,
+    LAND_LOCATOR,
+    LAND_YEAR,
+)
 from mloda_plugin_govdata.recipes import Compliance, LoadedRecipe, SourceCompliance, load_recipe, write_recipe
 
 RECIPES_DIR = Path(__file__).resolve().parents[1] / "recipes"
@@ -67,7 +72,6 @@ GOETTINGEN: dict[str, Any] = {
     "endyear": 2017,
 }
 FOREIGNERS: dict[str, Any] = {**GOETTINGEN, "name": "12521-0040"}
-LAND: dict[str, Any] = {"name": "12411-0010", "startyear": 2024, "endyear": 2024}
 REBASE = {"rebase_from_year": 2015, "rebase_to_year": 2016}
 
 GOETTINGEN_SHA256 = "39e590f654fd92f20306ef5a52ed59ef04bb757b1331e5216df2cfafcddd7411"
@@ -176,9 +180,7 @@ KREIS_FOREIGNERS_SHARE = ShippedRecipe(
             "its validity: the parser reads it as 0 with value_marker '-', a genuine count has an empty marker, so "
             "a consumer checks the marker before dividing. The foreigners table breaks down by "
             "sex: the total rows have an empty 2_variable_attribute_code and the label Insgesamt, GESM and GESW are "
-            "the parts. The two selections come back as two frames; dividing is a consumer's job. Stand-in for the "
-            "Regionalstatistik table 13211-02-05-4 (Arbeitslose and Arbeitslosenquote in one file), which needs "
-            "its own registration."
+            "the parts. The two selections come back as two frames; dividing is a consumer's job."
         ),
     ),
 )
@@ -186,7 +188,7 @@ KREIS_FOREIGNERS_SHARE = ShippedRecipe(
 LAND_POPULATION_PER_VOTER = ShippedRecipe(
     "land_population_per_voter.json",
     [
-        *_destatis_features(LAND, KEY, "1_variable_attribute_label", "value", "value_marker"),
+        *_destatis_features(LAND_LOCATOR, KEY, "1_variable_attribute_label", "time", "value", "value_marker"),
         *(
             Feature(name, options={BundeswahlleiterinReader.__name__: KERG_URL})
             for name in ("Nr", "Gebiet", "gehört zu", VOTERS, CSU_ZWEITSTIMMEN)
@@ -195,8 +197,11 @@ LAND_POPULATION_PER_VOTER = ShippedRecipe(
     Compliance(
         sources=[_destatis("12411-0010", _at(2026, 9, 8), LAND_SHA256), KERG_SOURCE],
         notes=(
-            "Population per eligible voter by Land. The kerg Land rows (gehört zu = 99) carry the AGS-2 in Nr, which "
-            "equals the Destatis DLAND code, so the join needs no name mapping; check the names on both sides with "
+            "Population per eligible voter by Land. Join year: an election joins the last Destatis Stichtag on or "
+            f"before its date, so the Bundestagswahl of {BTW25_ELECTION_DATE.strftime('%d.%m.%Y')} joins the "
+            f"population of 31.12.{LAND_YEAR} (time = {LAND_YEAR}). "
+            "The kerg Land rows (gehört zu = 99) carry the AGS-2 in Nr, which equals the Destatis DLAND code, so "
+            "the join needs no name mapping; check the names on both sides with "
             "mloda_plugin_govdata.feature_groups.harmonization.core.land_codes. A party column is empty where the "
             "party was not on the ballot (the CSU outside Bayern), which is not a zero. The links block lets a "
             "consumer FeatureGroup needing a column from each side join them "
@@ -210,10 +215,10 @@ LAND_POPULATION_PER_VOTER = ShippedRecipe(
 
 LAND_POPULATION = ShippedRecipe(
     "land_population.json",
-    _destatis_features(LAND, KEY, "value"),
+    _destatis_features(LAND_LOCATOR, KEY, "value"),
     Compliance(
         sources=[_destatis("12411-0010", _at(2026, 9, 8), LAND_SHA256)],
-        notes="Fortschreibung des Bevölkerungsstandes, Stichtag 2024-12-31, all 16 Länder (DLAND 01 to 16).",
+        notes=f"Fortschreibung des Bevölkerungsstandes, Stichtag {LAND_YEAR}-12-31, all 16 Länder (DLAND 01 to 16).",
     ),
 )
 

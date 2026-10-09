@@ -17,8 +17,8 @@ class AnnualPeriodFeature(HarmonizationFeature):
     """``<time>__year_period``: the annual period start (``date32``) of a time column.
 
     Accepts an integer year, a GENESIS JAHR or STAG label, or a date on the 31 Dec reference date. A
-    date inside the year is refused: which annual period a snapshot joins to is the open
-    snapshot-to-annual policy, not a conversion this group makes.
+    date inside the year is refused: the year a snapshot joins to is chosen where the join is defined,
+    not a conversion this group makes.
     """
 
     PREFIX_PATTERN = rf".*__(?P<period_freq>{Frequency.YEAR.value})_period$"

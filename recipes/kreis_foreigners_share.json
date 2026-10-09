@@ -193,6 +193,6 @@
         ]
       }
     ],
-    "notes": "Rate with denominator: Ausländer (BEV027) over Bevölkerungsstand (BEVSTD) per Kreis and Stichtag, the same three Göttingen keys and years as the re-basing recipe, so both sides carry '-' for a key outside its validity: the parser reads it as 0 with value_marker '-', a genuine count has an empty marker, so a consumer checks the marker before dividing. The foreigners table breaks down by sex: the total rows have an empty 2_variable_attribute_code and the label Insgesamt, GESM and GESW are the parts. The two selections come back as two frames; dividing is a consumer's job. Stand-in for the Regionalstatistik table 13211-02-05-4 (Arbeitslose and Arbeitslosenquote in one file), which needs its own registration."
+    "notes": "Rate with denominator: Ausländer (BEV027) over Bevölkerungsstand (BEVSTD) per Kreis and Stichtag, the same three Göttingen keys and years as the re-basing recipe, so both sides carry '-' for a key outside its validity: the parser reads it as 0 with value_marker '-', a genuine count has an empty marker, so a consumer checks the marker before dividing. The foreigners table breaks down by sex: the total rows have an empty 2_variable_attribute_code and the label Insgesamt, GESM and GESW are the parts. The two selections come back as two frames; dividing is a consumer's job."
   }
 }

@@ -4,7 +4,8 @@ GENESIS annual tables carry two labels for the same annual granularity: JAHR
 (a plain year, ``"2015"``) and STAG (a 31 Dec reference date, ``"2015-12-31"``
 or ``"31.12.2015"``). Both normalize to the same annual :class:`Period`; only
 the year matters, not which label produced it. kerg has no time column, the
-election date comes from the locator or recipe (:func:`from_snapshot`).
+election date comes from the locator or recipe (:func:`from_snapshot`); the
+Destatis Stichtag a snapshot joins to is :func:`stichtag_period`.
 Quarter and month parsing are not built:
 :class:`Frequency` keeps all three values for forward compatibility, but only
 ``year`` has a working parser.
@@ -85,16 +86,20 @@ def _annual_stag(label: str, *, year: int, month: int, day: int) -> Period:
 def from_snapshot(snapshot: date, freq: Frequency = Frequency.YEAR) -> Period:
     """Builds a :class:`Period` from a point-in-time snapshot (e.g. an election date).
 
-    Floors to the calendar year containing ``snapshot``. This is not the
-    snapshot-to-annual join policy (which Destatis reference year a snapshot
-    joins to for cross-source analysis); that decision is deferred to the
-    join plumbing. Only ``Frequency.YEAR`` is implemented; quarter and
-    month raise ``NotImplementedError``.
+    Floors to the calendar year containing ``snapshot``: the snapshot's own year,
+    not the Destatis year it joins to (that is :func:`stichtag_period`). Only
+    ``Frequency.YEAR`` is implemented; quarter and month raise ``NotImplementedError``.
     """
     freq = Frequency(freq)
     if freq is not Frequency.YEAR:
         raise NotImplementedError(f"{freq.value} periods are not built; only year periods are")
     return Period(date(snapshot.year, 1, 1), freq)
+
+
+def stichtag_period(snapshot: date) -> Period:
+    """The annual period of the last 31 Dec Stichtag on or before ``snapshot`` (the join year for an election)."""
+    year = snapshot.year if (snapshot.month, snapshot.day) == (12, 31) else snapshot.year - 1
+    return Period(date(year, 1, 1), Frequency.YEAR)
 
 
 def assert_same_frequency(left: Period, right: Period) -> None:

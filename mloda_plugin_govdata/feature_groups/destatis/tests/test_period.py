@@ -11,6 +11,7 @@ from mloda_plugin_govdata.feature_groups.destatis.core.period import (
     assert_same_frequency,
     from_snapshot,
     parse_genesis_time,
+    stichtag_period,
 )
 
 _YEARS = st.integers(min_value=1900, max_value=2100)
@@ -90,9 +91,22 @@ def test_from_snapshot_floors_to_the_start_of_year(d: date) -> None:
 
 @given(d=st.dates(min_value=date(1900, 1, 1), max_value=date(2100, 12, 31)))
 def test_from_snapshot_matches_genesis_annual_period_for_the_same_year(d: date) -> None:
-    # kerg's snapshot and Destatis' annual reference agree on the year; the
-    # snapshot-to-annual join policy is not yet decided.
+    # The snapshot's own year as a Destatis annual period; the year it joins to is stichtag_period.
     assert from_snapshot(d) == parse_genesis_time(f"{d.year:04d}")
+
+
+@given(d=st.dates(min_value=date(1900, 1, 1), max_value=date(2100, 12, 31)))
+def test_stichtag_period_is_the_last_31_dec_on_or_before_the_snapshot(d: date) -> None:
+    year = stichtag_period(d).start.year
+    assert date(year, 12, 31) <= d < date(year + 1, 12, 31)
+
+
+@pytest.mark.parametrize(
+    ("snapshot", "year"),
+    [(date(2025, 2, 23), 2024), (date(2024, 12, 31), 2024), (date(2025, 1, 1), 2024)],
+)
+def test_stichtag_period_cases(snapshot: date, year: int) -> None:
+    assert stichtag_period(snapshot) == parse_genesis_time(f"31.12.{year}")
 
 
 @pytest.mark.parametrize("freq", [Frequency.QUARTER, Frequency.MONTH])

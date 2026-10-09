@@ -12,7 +12,7 @@ from mloda.user import Feature, Index, JoinSpec, Link, Options, load_features_fr
 
 from mloda_plugin_govdata.feature_groups.destatis import DestatisLocator, DestatisReader
 from mloda_plugin_govdata.feature_groups.govdata import BundeswahlleiterinReader, GovDataFeature, GovDataLocator
-from mloda_plugin_govdata.feature_groups.land_population_per_voter import LAND_LINK
+from mloda_plugin_govdata.feature_groups.land_population_per_voter import LAND_LINK, LAND_LOCATOR
 from mloda_plugin_govdata.recipes import (
     Compliance,
     RecipeError,
@@ -25,7 +25,6 @@ from mloda_plugin_govdata.recipes import (
 )
 from mloda_plugin_govdata.recipes.write import _UNSUPPORTED, SUPPORTED_FEATURE_PARAMETERS
 from scripts.write_recipes import KERG_URL, LAND_SHA256
-from scripts.write_recipes import LAND as LAND_LOCATOR
 
 BERLIN_URL = "https://www.wahlen-berlin.de/wahlen/BE2023/AFSPRAES/agh/Datenexport_AGH2023_Zweitstimme_W_BE.csv"
 COMPLIANCE = Compliance(

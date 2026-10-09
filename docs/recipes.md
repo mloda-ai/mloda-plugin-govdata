@@ -119,6 +119,9 @@ the same columns, iterate `result.frames()` instead. Check the Land names on eac
 FeatureGroup that needs a column from each side join them instead (mloda executes a join only for such a
 consumer); `feature_groups.land_population_per_voter.LandPopulationPerVoter` is one, computing population
 per voter; its population input carries the link, so it also runs without `links=`.
+An election joins the last Destatis 31 December Stichtag on or before its date
+(`feature_groups.destatis.core.period.stichtag_period`): the Bundestagswahl of 23.02.2025 joins the population of 31.12.2024,
+and the recipe's `time` column shows that year.
 A `-` in a GENESIS cell arrives as 0 with the sign kept in
 `value_marker`; only the harmonization step, which knows the validity windows, turns it into not applicable,
 so a consumer of raw columns reads the marker before taking a 0 as a count. Each recipe except

@@ -4,13 +4,19 @@ import hashlib
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs
 
 import respx
 from mloda.user import Feature
 
+from mloda_plugin_govdata.feature_groups.destatis.core.period import parse_genesis_time, stichtag_period
 from mloda_plugin_govdata.feature_groups.harmonization.core.land_codes import LAND_NAMES, check_land_names
 from mloda_plugin_govdata.feature_groups.harmonization.core.tests.test_land_codes import BUNDESGEBIET, BUNDESGEBIET_ROW
-from mloda_plugin_govdata.feature_groups.land_population_per_voter import LAND_LINK, LandPopulationPerVoter
+from mloda_plugin_govdata.feature_groups.land_population_per_voter import (
+    BTW25_ELECTION_DATE,
+    LAND_LINK,
+    LandPopulationPerVoter,
+)
 from mloda_plugin_govdata.recipes import LoadedRecipe, frames_by_column, load_recipe
 from scripts.write_recipes import CSU_ZWEITSTIMMEN, KEY, LAND_POPULATION_PER_VOTER, VOTERS
 
@@ -42,11 +48,17 @@ def test_the_recipe_pins_both_payloads_and_carries_the_link(recipes_dir: Path) -
 
 @respx.mock
 def test_both_sides_run_and_the_land_rows_line_up_by_name(recipes_dir: Path, genesis: Genesis, kerg: Mock) -> None:
-    genesis({"12411-0010": LAND_ZIP})
+    route = genesis({"12411-0010": LAND_ZIP})
     kerg((GOVDATA_FIXTURES / "kerg_sample.csv").read_bytes() + BUNDESGEBIET_ROW)
     frames = frames_by_column(run(_load(recipes_dir).features))  # no consumer requested: two frames, unjoined
     destatis, election = frames["value"], frames["Nr"]
     assert destatis.num_rows == 16
+    # The election joins the last Stichtag on or before its date: the request carries the policy year,
+    # and the returned time column (pinned by the fixture) agrees.
+    stichtag = stichtag_period(BTW25_ELECTION_DATE)
+    sent = parse_qs(route.calls.last.request.content.decode("utf-8"))
+    assert sent["startyear"] == sent["endyear"] == [str(stichtag.start.year)]
+    assert {parse_genesis_time(str(year)) for year in destatis.column("time").to_pylist()} == {stichtag}
     check_land_names(zip(destatis.column(KEY).to_pylist(), destatis.column("1_variable_attribute_label").to_pylist()))
     land_rows = _land_rows(election)  # the Bundesgebiet row has no parent and stays out
     check_land_names((nr, row["Gebiet"]) for nr, row in land_rows.items())

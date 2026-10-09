@@ -159,8 +159,8 @@ Output, row-aligned with the input: `~key`, `~nuts1`, `~nuts2`, `~nuts3`, `~vers
 
 Turns a time column into the annual period start as `date32`: an integer year, a GENESIS JAHR or STAG
 label, or a date on the 31 December reference date. A date inside the year (a 30 June Stichtag, an
-election date) is refused: which annual period a snapshot joins to is a policy decision this group does
-not make. `period_freq` is `year`; quarter and month are not built.
+election date) is refused: the year a snapshot joins to is chosen where the join is defined (see
+`stichtag_period` in [recipes](recipes.md)), not here. `period_freq` is `year`; quarter and month are not built.
 
 ## Over other readers
 
