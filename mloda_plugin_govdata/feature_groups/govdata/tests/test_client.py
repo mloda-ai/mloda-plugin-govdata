@@ -1,16 +1,27 @@
 """Level 1: retry policy for transient transport / status failures."""
 
+from types import SimpleNamespace
+from typing import Any, cast
+
 import httpx
 import pytest
 import respx
 
 from mloda_plugin_govdata.feature_groups.govdata.core.client import (
+    _BASE_WAIT,
     RetryableStatusError,
     build_client,
     request_with_retry,
 )
 
 URL = "https://example.org/x"
+
+
+@pytest.mark.parametrize(("attempt", "low", "high"), [(1, 0.5, 1.5), (2, 1.0, 2.0), (4, 4.0, 5.0), (6, 10.0, 10.0)])
+def test_backoff_doubles_from_half_a_second_plus_jitter_up_to_ten(attempt: int, low: float, high: float) -> None:
+    # Imported before the autouse fixture patches it, so this is the real policy.
+    wait = _BASE_WAIT(cast(Any, SimpleNamespace(attempt_number=attempt)))
+    assert low <= wait <= high
 
 
 @pytest.fixture(autouse=True)

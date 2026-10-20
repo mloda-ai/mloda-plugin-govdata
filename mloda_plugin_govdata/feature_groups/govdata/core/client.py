@@ -16,7 +16,7 @@ RETRYABLE_STATUS: frozenset[int] = frozenset({429, 500, 502, 503, 504})
 MAX_ATTEMPTS = 5
 MAX_RETRY_AFTER = 60.0  # cap a server's Retry-After so it cannot stall the client for hours
 
-_BASE_WAIT = wait_exponential_jitter(initial=0.5, max=10.0)
+_BASE_WAIT = wait_exponential_jitter(multiplier=0.5, max=10.0)
 
 _T = TypeVar("_T", bound="OwnedHttpClient")
 
