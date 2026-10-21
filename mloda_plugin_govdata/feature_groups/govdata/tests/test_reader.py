@@ -19,6 +19,7 @@ from mloda_plugin_govdata.feature_groups.govdata.bundeswahlleiterin import (
     OPTION_WAHL_HEADER_ROWS,
     OPTION_WAHL_LABEL_COLUMNS,
     OPTION_WAHL_SKIPROWS,
+    OPTION_WAHL_TEXT_COLUMNS,
     OPTION_WAHL_VALUE_TYPE,
     BundeswahlleiterinReader,
 )
@@ -43,6 +44,16 @@ BERLIN_OPTIONS: dict[str, Any] = {
     OPTION_WAHL_HEADER_ROWS: 1,
     OPTION_WAHL_LABEL_COLUMNS: 12,
     OPTION_WAHL_VALUE_TYPE: "float",
+}
+KERG2_URL = "https://www.bundeswahlleiterin.de/bundestagswahlen/2025/ergebnisse/opendata/btw25/csv/kerg2.csv"
+# kerg2.csv layout: long format with two trailing text columns.
+KERG2_OPTIONS: dict[str, Any] = {
+    BundeswahlleiterinReader.__name__: KERG2_URL,
+    OPTION_WAHL_SKIPROWS: 9,
+    OPTION_WAHL_HEADER_ROWS: 1,
+    OPTION_WAHL_LABEL_COLUMNS: 11,
+    OPTION_WAHL_VALUE_TYPE: "float",
+    OPTION_WAHL_TEXT_COLUMNS: ["Bemerkung", "Gewählt"],
 }
 
 
@@ -230,6 +241,22 @@ def test_berlin_wahl_reader_level2(fixtures_dir: Path, tmp_path: Path, monkeypat
 
 
 @respx.mock
+def test_kerg2_text_columns_level2(fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(BundeswahlleiterinReader, "cache_dir", str(tmp_path))
+    kerg2_bytes = (fixtures_dir / "kerg2_sample.csv").read_bytes()
+    respx.get(KERG2_URL).mock(return_value=httpx.Response(200, content=kerg2_bytes, headers={"ETag": '"k2"'}))
+    result = mloda.run_all(
+        [Feature("Gewählt", options=dict(KERG2_OPTIONS)), Feature("Anzahl", options=dict(KERG2_OPTIONS))],
+        compute_frameworks=["PyArrowTable"],
+    )
+    table = result[0]
+    assert table.schema.field("Gewählt").type == pa.string()
+    assert table.schema.field("Anzahl").type == pa.float64()
+    assert {"–", "CDU"} <= set(table.column("Gewählt").to_pylist())
+    assert table.column("Anzahl").to_pylist()[0] == 60510631.0
+
+
+@respx.mock
 def test_geometry_options_default_to_btw25(fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(BundeswahlleiterinReader, "cache_dir", str(tmp_path))
     kerg_bytes = (fixtures_dir / "kerg_sample.csv").read_bytes()
@@ -252,6 +279,13 @@ def test_geometry_options_default_to_btw25(fixtures_dir: Path, tmp_path: Path, m
     assert defaulted.equals(explicit)
 
 
+def test_text_columns_takes_a_bare_name(fixtures_dir: Path) -> None:
+    locator = GovDataLocator.from_string(KERG2_URL)
+    options = Options({**KERG2_OPTIONS, OPTION_WAHL_TEXT_COLUMNS: "Gewählt"})
+    table = BundeswahlleiterinReader._parse(fixtures_dir / "kerg2_sample.csv", locator, options=options)
+    assert table.schema.field("Gewählt").type == pa.string()
+
+
 def test_bad_geometry_option_raises(fixtures_dir: Path) -> None:
     locator = GovDataLocator.from_string(KERG_URL)
     options = Options({OPTION_WAHL_SKIPROWS: "five"})
@@ -266,6 +300,8 @@ def test_bad_geometry_option_raises(fixtures_dir: Path) -> None:
         (OPTION_WAHL_HEADER_ROWS, 0),
         (OPTION_WAHL_LABEL_COLUMNS, -1),
         (OPTION_WAHL_VALUE_TYPE, "not-a-column-type"),
+        (OPTION_WAHL_TEXT_COLUMNS, ""),
+        (OPTION_WAHL_TEXT_COLUMNS, ["Gewählt", ""]),
     ],
 )
 @respx.mock

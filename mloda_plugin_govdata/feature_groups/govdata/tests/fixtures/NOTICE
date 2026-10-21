@@ -23,6 +23,15 @@ Sample: the 5-line preamble, the 3 header rows, the first Wahlkreis rows, and al
 "gehört zu" 99), unchanged. Land rows 02 to 16 were appended at the end on 2026-09-08 from the same file, so they
 do not follow their own Wahlkreis block as in the source; the Bundesgebiet row (Nr 99) is not included.
 
+kerg2_sample.csv
+Source: Bundeswahlleiterin open-data file kerg2.csv (Bundestagswahl 2025, Ergebnisse nach Wahlkreisen, Endgültig).
+URL: https://www.bundeswahlleiterin.de/bundestagswahlen/2025/ergebnisse/opendata/btw25/csv/kerg2.csv
+Copyright line in the file: "(c) Die Bundeswahlleiterin, Wiesbaden 2025".
+License stated in the file: Datenlizenz Deutschland Namensnennung Version 2.0 (dl-de/by-2-0), https://www.govdata.de/dl-de/by-2-0
+Attribution: Die Bundeswahlleiterin, Wiesbaden 2025, dl-de/by-2-0
+Sample: the 9-line preamble, the header row, the first 2 Bundesgebiet rows, the first 6 rows of Wahlkreis 001 (Gewählt
+is the dash) and the first 4 rows of Wahlkreis 002 (Gewählt is CDU), unchanged; rows in between are left out.
+
 berlin_wahl_sample.csv
 Source: Datenexport CSV of the 2023 Abgeordnetenhaus election (Zweitstimme, Wahlbezirke), publisher Der Landeswahlleiter für Berlin / Amt für Statistik Berlin-Brandenburg (as stated in the site footer).
 URL: https://www.wahlen-berlin.de/wahlen/BE2023/AFSPRAES/agh/Datenexport_AGH2023_Zweitstimme_W_BE.csv

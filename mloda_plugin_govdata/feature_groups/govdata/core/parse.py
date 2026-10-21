@@ -12,6 +12,7 @@ from __future__ import annotations
 import csv
 import io
 import os
+from collections.abc import Callable
 from datetime import date, datetime
 from enum import Enum
 
@@ -97,6 +98,14 @@ def _to_string(raw: str) -> str | None:
     return None if value == "" else value
 
 
+_CONVERTERS: dict[ColumnType, Callable[[str], object]] = {
+    ColumnType.STRING: _to_string,
+    ColumnType.INTEGER: _to_int,
+    ColumnType.FLOAT: _to_float,
+    ColumnType.DATE: _to_date,
+}
+
+
 def _typed_table(cells: dict[str, list[str]], spec: dict[str, ColumnType]) -> pa.Table:
     """Build a typed Arrow table from raw string columns and a name to type spec."""
     arrays: dict[str, pa.Array] = {}
@@ -104,15 +113,13 @@ def _typed_table(cells: dict[str, list[str]], spec: dict[str, ColumnType]) -> pa
     for name, ctype in spec.items():
         if name not in cells:
             raise KeyError(f"column {name!r} not found; available: {list(cells)}")
-        raw = cells[name]
-        if ctype is ColumnType.STRING:
-            values: list[object] = [_to_string(v) for v in raw]
-        elif ctype is ColumnType.INTEGER:
-            values = [_to_int(v) for v in raw]
-        elif ctype is ColumnType.FLOAT:
-            values = [_to_float(v) for v in raw]
-        else:
-            values = [_to_date(v) for v in raw]
+        convert = _CONVERTERS[ctype]
+        values: list[object] = []
+        for row, raw in enumerate(cells[name]):
+            try:
+                values.append(convert(raw))
+            except ValueError as exc:
+                raise ValueError(f"column {name!r}, row {row}: {exc}") from exc
         arrays[name] = pa.array(values, type=_ARROW_TYPE[ctype])
         fields.append(pa.field(name, _ARROW_TYPE[ctype]))
     return pa.table(arrays, schema=pa.schema(fields))
@@ -223,13 +230,15 @@ def parse_multi_header_csv_bytes(
     label_columns: int = 0,
     value_type: ColumnType = ColumnType.INTEGER,
     encoding: str | None = None,
+    text_columns: tuple[str, ...] | str = (),
 ) -> pa.Table:
     """Parse a publisher CSV with a multi-row merged header into a typed Arrow table.
 
     Skips ``skiprows`` preamble lines, flattens the next ``header_rows`` rows into
     unique column names, drops blank/separator rows, and types the first
-    ``label_columns`` columns as strings with the rest as ``value_type``. Parsing
-    goes through the csv module, so quoted fields and line endings are handled.
+    ``label_columns`` columns and any column named in ``text_columns`` as strings,
+    the rest as ``value_type``. Parsing goes through the csv module, so quoted
+    fields and line endings are handled.
     """
     enc = encoding or detect_encoding(data)
     rows = list(csv.reader(io.StringIO(data.decode(enc)), delimiter=sep))
@@ -238,6 +247,11 @@ def parse_multi_header_csv_bytes(
         raise ValueError("not enough header rows for the requested header_rows")
     names = _flatten_header(header_block)
     ncols = len(names)
+    if isinstance(text_columns, str):
+        text_columns = (text_columns,)  # one name, not its letters
+    unknown = [name for name in text_columns if name not in names]
+    if unknown:
+        raise KeyError(f"text columns {unknown} not found; available: {names}")
 
     cells: dict[str, list[str]] = {name: [] for name in names}
     for row in rows[skiprows + header_rows :]:
@@ -247,7 +261,10 @@ def parse_multi_header_csv_bytes(
         for name, value in zip(names, fields):
             cells[name].append(value)
 
-    spec = {name: (ColumnType.STRING if i < label_columns else value_type) for i, name in enumerate(names)}
+    spec = {
+        name: (ColumnType.STRING if i < label_columns or name in text_columns else value_type)
+        for i, name in enumerate(names)
+    }
     return _typed_table(cells, spec)
 
 
@@ -260,6 +277,7 @@ def parse_multi_header_csv(
     label_columns: int = 0,
     value_type: ColumnType = ColumnType.INTEGER,
     encoding: str | None = None,
+    text_columns: tuple[str, ...] | str = (),
 ) -> pa.Table:
     """Read ``path`` and parse it with :func:`parse_multi_header_csv_bytes`."""
     with open(path, "rb") as handle:
@@ -272,4 +290,5 @@ def parse_multi_header_csv(
         label_columns=label_columns,
         value_type=value_type,
         encoding=encoding,
+        text_columns=text_columns,
     )

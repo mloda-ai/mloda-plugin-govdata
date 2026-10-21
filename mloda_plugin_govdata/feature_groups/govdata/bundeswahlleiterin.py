@@ -20,6 +20,7 @@ OPTION_WAHL_SKIPROWS = "govdata_wahl_skiprows"
 OPTION_WAHL_HEADER_ROWS = "govdata_wahl_header_rows"
 OPTION_WAHL_LABEL_COLUMNS = "govdata_wahl_label_columns"
 OPTION_WAHL_VALUE_TYPE = "govdata_wahl_value_type"
+OPTION_WAHL_TEXT_COLUMNS = "govdata_wahl_text_columns"
 
 
 def _is_non_negative_int(value: Any) -> bool:
@@ -32,6 +33,19 @@ def _is_non_negative_int(value: Any) -> bool:
     if isinstance(value, numbers.Integral):
         return int(value) >= 0
     return isinstance(value, str) and value.isdecimal() and int(value) >= 0
+
+
+def _is_column_name(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _as_names(value: Any) -> tuple[str, ...]:
+    """The text-columns option as a tuple: unset is none, a bare string is one name."""
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return (value,)
+    return tuple(value)
 
 
 class BundeswahlleiterinReader(BaseGovDataReader[GovDataLocator]):
@@ -73,6 +87,12 @@ class BundeswahlleiterinReader(BaseGovDataReader[GovDataLocator]):
             scalar_only=True,
             allowed_values=tuple(ColumnType),
         ),
+        OPTION_WAHL_TEXT_COLUMNS: PropertySpec(
+            "Column names read as text wherever they sit (e.g. kerg2.csv's trailing Gewählt).",
+            default=None,
+            strict_validation=True,
+            element_validator=_is_column_name,
+        ),
     }
 
     @classmethod
@@ -83,4 +103,5 @@ class BundeswahlleiterinReader(BaseGovDataReader[GovDataLocator]):
             header_rows=int(cls.reader_option(OPTION_WAHL_HEADER_ROWS, options)),
             label_columns=int(cls.reader_option(OPTION_WAHL_LABEL_COLUMNS, options)),
             value_type=ColumnType(cls.reader_option(OPTION_WAHL_VALUE_TYPE, options)),
+            text_columns=_as_names(cls.reader_option(OPTION_WAHL_TEXT_COLUMNS, options)),
         )

@@ -66,6 +66,8 @@ result = mloda.run_all(
 
 Column names are the header rows joined by spaces (`Wahlberechtigte Zweitstimmen Endgültig`). The layout is set per feature by options whose defaults fit `kerg.csv`: `OPTION_WAHL_SKIPROWS` (preamble lines, 5), `OPTION_WAHL_HEADER_ROWS` (3), `OPTION_WAHL_LABEL_COLUMNS` (leading text columns, 4), and `OPTION_WAHL_VALUE_TYPE` (type of the rest, `ColumnType.INTEGER`). An empty value cell becomes null, not 0.
 
+`OPTION_WAHL_TEXT_COLUMNS` names further columns read as text wherever they sit. The long-format `kerg2.csv` ends with two text columns, so it reads with `OPTION_WAHL_SKIPROWS: 9`, `OPTION_WAHL_HEADER_ROWS: 1`, `OPTION_WAHL_LABEL_COLUMNS: 11`, `OPTION_WAHL_VALUE_TYPE: ColumnType.FLOAT` and `OPTION_WAHL_TEXT_COLUMNS: ["Bemerkung", "Gewählt"]`. In `Gewählt`, the dash `–` is text, not a value marker (a winner without a seat).
+
 ## Air quality (UBA)
 
 Fetches the Umweltbundesamt Air Data v4 `measures` endpoint and flattens it to one typed row per station and timestamp. Query parameters are per-feature options (here: hourly ozone at station 143); a bad value is rejected before any network call:

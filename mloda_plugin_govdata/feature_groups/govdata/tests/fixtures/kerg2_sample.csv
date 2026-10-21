@@ -1,0 +1,22 @@
+﻿(c) Die Bundeswahlleiterin, Wiesbaden 2025;;;;;;;;;;;;;;;;
+Datenlizenz Deutschland – Namensnennung – Version 2.0 (https://www.govdata.de/dl-de/by-2-0);;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+Ergebnisse nach Wahlkreisen;;;;;;;;;;;;;;;;
+Status:;Endgültig;;;;;;;;;;;;;;;
+Stand:;14.03.2025;10:50;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+Format: CSV. Trennzeichen: Semikolon. Zeichensatz: UTF-8 mit BOM;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+Wahlart;Wahltag;Gebietsart;Gebietsnummer;Gebietsname;UegGebietsart;UegGebietsnummer;Gruppenart;Gruppenname;Gruppenreihenfolge;Stimme;Anzahl;Prozent;VorpAnzahl;VorpProzent;DiffProzent;DiffProzentPkt;Bemerkung;Gewählt
+BT;23.02.2025;Bund;99;Bundesgebiet;;;System-Gruppe;Wahlberechtigte;-4;;60510631;;61172771;;-1,08241;;;
+BT;23.02.2025;Bund;99;Bundesgebiet;;;System-Gruppe;Wählende;-3;;49928653;82,5122;46707343;76,353159;6,896796;6,159041;;
+BT;23.02.2025;Wahlkreis;001;Flensburg – Schleswig;LAND;01;System-Gruppe;Wahlberechtigte;-4;;232131;;231536;;0,256979;;;–
+BT;23.02.2025;Wahlkreis;001;Flensburg – Schleswig;LAND;01;System-Gruppe;Wählende;-3;;192882;83,091875;180112;77,790063;7,090033;5,301812;;–
+BT;23.02.2025;Wahlkreis;001;Flensburg – Schleswig;LAND;01;System-Gruppe;Ungültige;-2;1;1097;0,568742;1537;0,853358;-28,627196;-0,284616;;–
+BT;23.02.2025;Wahlkreis;001;Flensburg – Schleswig;LAND;01;System-Gruppe;Ungültige;-2;2;988;0,51223;1487;0,825597;-33,557498;-0,313367;;–
+BT;23.02.2025;Wahlkreis;001;Flensburg – Schleswig;LAND;01;System-Gruppe;Gültige;-1;1;191785;99,431258;178575;99,146642;7,397452;0,284616;;–
+BT;23.02.2025;Wahlkreis;001;Flensburg – Schleswig;LAND;01;System-Gruppe;Gültige;-1;2;191894;99,48777;178625;99,174403;7,428411;0,313367;;–
+BT;23.02.2025;Wahlkreis;002;Nordfriesland – Dithmarschen Nord;LAND;01;System-Gruppe;Wahlberechtigte;-4;;186019;;188267;;-1,194049;;;CDU
+BT;23.02.2025;Wahlkreis;002;Nordfriesland – Dithmarschen Nord;LAND;01;System-Gruppe;Wählende;-3;;153755;82,655535;145387;77,223836;5,755673;5,431699;;CDU
+BT;23.02.2025;Wahlkreis;002;Nordfriesland – Dithmarschen Nord;LAND;01;System-Gruppe;Ungültige;-2;1;1038;0,6751;1337;0,919615;-22,3635;-0,244515;;CDU
+BT;23.02.2025;Wahlkreis;002;Nordfriesland – Dithmarschen Nord;LAND;01;System-Gruppe;Ungültige;-2;2;840;0,546324;1242;0,854272;-32,36715;-0,307948;;CDU

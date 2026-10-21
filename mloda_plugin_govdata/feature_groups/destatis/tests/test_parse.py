@@ -265,10 +265,14 @@ def test_stag_time_label_parses_through_the_period_model() -> None:
         assert table.column("time").to_pylist() == [2015]
 
 
-def test_a_cell_that_cannot_be_typed_names_the_offending_row() -> None:
+@pytest.mark.parametrize(
+    ("time", "value", "match"),
+    [("not-a-year", "1", "column 'time', row 0"), ("2015", "abc", "column 'value', row 0: could not convert")],
+)
+def test_a_cell_that_cannot_be_typed_names_the_offending_row(time: str, value: str, match: str) -> None:
     header = ";".join(ONE_BLOCK_HEADER) + "\n"
-    row = "12411;Bevoelkerung;JAHR;Jahr;not-a-year;DINSG;Deutschland insgesamt;DG;Deutschland;1;Anzahl;X;Y\n"
-    with pytest.raises(ValueError, match="column 'time', row 0"):
+    row = f"12411;Bevoelkerung;JAHR;Jahr;{time};DINSG;Deutschland insgesamt;DG;Deutschland;{value};Anzahl;X;Y\n"
+    with pytest.raises(ValueError, match=match):
         parse_ffcsv_bytes((header + row).encode("utf-8-sig"))
 
 

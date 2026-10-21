@@ -165,8 +165,7 @@ def parse_ffcsv_bytes(data: bytes) -> pa.Table:
     ``govdata/core/parse.py``. ``time`` is parsed through the period model into an annual int64
     year (both JAHR and STAG labels); ``value_marker`` carries the raw sign of the ``value`` cell,
     empty for a plain number, next to whatever ``value_q`` the table declares. A blank ``time`` or
-    ``value`` cell raises naming the row; any other cell that cannot be typed raises the underlying
-    conversion error.
+    ``value`` cell, or any cell that cannot be typed, raises naming its column and row.
     """
     encoding = detect_encoding(data)
     try:

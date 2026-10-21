@@ -65,6 +65,13 @@ def test_value_markers_map_correctly(fixtures_dir: Path) -> None:
     assert "Möhringen" in table.column("Gebiet").to_pylist()
 
 
+def test_unicode_dash_is_not_a_value_marker() -> None:
+    # Bundeswahlleiterin files use U+2013 only as text (Gewählt: no seat), so a numeric read fails naming the cell.
+    data = "Gebiet;Wert\r\nFlensburg;–\r\n".encode()
+    with pytest.raises(ValueError, match=r"column 'Wert', row 0: could not convert string to float"):
+        parse_german_csv_bytes(data, {"Gebiet": ColumnType.STRING, "Wert": ColumnType.FLOAT})
+
+
 def test_unknown_columns_default_to_string(fixtures_dir: Path) -> None:
     table = parse_german_csv(fixtures_dir / "value_markers.csv")
     assert all(field_type == pa.string() for field_type in table.schema.types)
@@ -110,6 +117,30 @@ def test_multi_header_flattens_and_types_kerg(fixtures_dir: Path) -> None:
     assert table.schema.field("Wahlberechtigte Erststimmen Endgültig").type == pa.int64()
     assert table.column("Gebiet").to_pylist()[0] == "Flensburg – Schleswig"
     assert table.column("Wahlberechtigte Erststimmen Endgültig").to_pylist()[0] == 232131
+    assert table.column("Gewählt").to_pylist()[0] == "–"  # winner without a seat, kept as text
+
+
+def test_multi_header_text_columns_kerg2(fixtures_dir: Path) -> None:
+    # kerg2.csv: long format whose last two columns are text after the numeric ones.
+    table = parse_multi_header_csv(
+        fixtures_dir / "kerg2_sample.csv",
+        skiprows=9,
+        header_rows=1,
+        label_columns=11,
+        value_type=ColumnType.FLOAT,
+        text_columns=("Bemerkung", "Gewählt"),
+    )
+    assert table.num_rows == 12
+    assert table.schema.field("Gewählt").type == pa.string()
+    assert table.schema.field("Bemerkung").type == pa.string()
+    assert table.schema.field("Anzahl").type == pa.float64()
+    assert set(table.column("Gewählt").to_pylist()) == {None, "–", "CDU"}
+    assert table.column("Prozent").to_pylist()[1] == 82.5122
+
+
+def test_multi_header_unknown_text_column_raises() -> None:
+    with pytest.raises(KeyError, match="Gewaehlt"):
+        parse_multi_header_csv_bytes(b"A;B\r\n1;x\r\n", header_rows=1, text_columns=("Gewaehlt",))
 
 
 def test_multi_header_forward_fills_merged_cells() -> None:
