@@ -1,7 +1,8 @@
-"""The marimo demos must define their apps without running any cell (no network)."""
+"""The marimo demos must define their apps without running any cell (no network); demo and doc imports must exist."""
 
 import ast
 import importlib.util
+import re
 from pathlib import Path
 from typing import TypeGuard
 
@@ -13,11 +14,20 @@ import pytest
 DEMO_PATH = Path(__file__).resolve().parents[1] / "demos" / "govdata_demo.py"
 RECIPES_DIR = DEMO_PATH.parents[1] / "recipes"
 DEMO_PATHS = sorted(path for path in DEMO_PATH.parent.glob("*.py") if not path.name.startswith("_"))
+REPO_ROOT = DEMO_PATH.parents[1]
+# Only unindented ```python fences, the one style the docs use.
+PYTHON_FENCE = re.compile(r"^```python\n(.*?)^```", re.MULTILINE | re.DOTALL)
+DOC_PATHS = [
+    path
+    for path in [REPO_ROOT / "README.md", *sorted((REPO_ROOT / "docs").glob("*.md"))]
+    if PYTHON_FENCE.search(path.read_text(encoding="utf-8"))
+]
 
 
-def test_demo_glob_finds_all_demos() -> None:
+def test_globs_find_all_demos_and_docs() -> None:
     # A silently empty glob must fail, not skip the parametrized tests.
     assert {DEMO_PATH, DEMO_PATH.with_name("berlin_wahl_2026_demo.py")} <= set(DEMO_PATHS)
+    assert {REPO_ROOT / "README.md", REPO_ROOT / "docs" / "schnellstart.md"} <= set(DOC_PATHS)
 
 
 @pytest.mark.parametrize("demo_path", DEMO_PATHS, ids=lambda path: path.stem)
@@ -30,15 +40,16 @@ def test_demo_defines_marimo_app(demo_path: Path) -> None:
     assert isinstance(module.app, marimo.App)
 
 
-@pytest.mark.parametrize("demo_path", DEMO_PATHS, ids=lambda path: path.stem)
-def test_every_mloda_name_a_demo_imports_exists(demo_path: Path) -> None:
-    # Cell bodies never run here, so a moved module or a renamed export only shows up this way.
+@pytest.mark.parametrize("path", DEMO_PATHS + DOC_PATHS, ids=lambda path: str(path.relative_to(REPO_ROOT)))
+def test_every_mloda_name_it_imports_exists(path: Path) -> None:
+    # Cell bodies and doc snippets never run here, so a moved module or a renamed export only shows up this way.
     imports = [
         node
-        for node in ast.walk(_demo_tree(demo_path))
+        for tree in _python_trees(path)
+        for node in ast.walk(tree)
         if isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] in {"mloda", "mloda_plugin_govdata"}
     ]
-    assert imports
+    assert imports, f"{path.name} imports nothing from mloda or mloda_plugin_govdata"
     missing = [
         f"{node.module}.{alias.name}"
         for node in imports
@@ -50,6 +61,14 @@ def test_every_mloda_name_a_demo_imports_exists(demo_path: Path) -> None:
 
 def _demo_tree(path: Path = DEMO_PATH) -> ast.Module:
     return ast.parse(path.read_text(encoding="utf-8"))
+
+
+def _python_trees(path: Path) -> list[ast.Module]:
+    if path.suffix == ".py":
+        return [_demo_tree(path)]
+    # Every python fence must parse on its own; a REPL-style block fails here on purpose.
+    blocks = PYTHON_FENCE.findall(path.read_text(encoding="utf-8"))
+    return [ast.parse(block, filename=f"{path.name}, python block {n}") for n, block in enumerate(blocks, 1)]
 
 
 def _recipe_files_the_demo_loads() -> set[str]:
