@@ -24,7 +24,7 @@ table = result[0]  # pyarrow.Table with the requested columns
 result.plan  # resolved execution steps: which FeatureGroup ran on which framework
 ```
 
-For any other GovData CSV dataset, `GovDataReader` works out of the box and reads every column as a string; subclass it and set `schema` for typed columns. Set `BaseGovDataReader.cache_dir` to control where downloads are cached.
+For any other GovData CSV dataset in the German layout (`;` between values, one header row), `GovDataReader` works out of the box and reads every column as a string; subclass it and set `schema` for typed columns. Set `BaseGovDataReader.cache_dir` to control where downloads are cached.
 
 ### Find a dataset
 

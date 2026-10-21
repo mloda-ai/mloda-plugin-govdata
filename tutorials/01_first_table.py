@@ -26,6 +26,9 @@ def _(mo):
 
     **Time:** about 15 minutes. **You need:** basic Python and a network connection. No account.
 
+    **Setup:** clone the repository and run `uv sync --all-extras` (see the README), then
+    `uv run marimo edit tutorials/01_first_table.py`.
+
     [mloda](https://github.com/mloda-ai/mloda) works like this: you name the columns you want, and mloda
     finds the code that fetches and prepares them. In mloda, a column you ask for is called a *feature*.
     This plugin adds that code for German open government data.
@@ -71,7 +74,8 @@ def _(mo):
     ## Step 1: find a dataset
 
     The catalog is in German, so we search in German: *Einwohner* means residents, *Altersgruppen* means
-    age groups. `search_datasets` asks the catalog and returns each match with its id and title.
+    age groups. `search_datasets` asks the catalog and returns each match with its id (the catalog calls
+    it `name`) and title.
     """)
     return
 
@@ -90,8 +94,8 @@ def _(build_client, pd, search_datasets):
 def _(mo):
     mo.md("""
     Look for the id `einwohner-nach-altersgruppen-und-stadtbezirken`: residents by age group and city
-    district. We copy that id by hand into the next cell, so the rest of the tutorial does not depend on
-    the search order.
+    district. The next cell holds that id, copied by hand, so the rest of the tutorial works even if the
+    search shows other results.
     """)
     return
 
@@ -108,11 +112,10 @@ def _(mo):
     ## Step 2: see the columns
 
     A *reader* turns one kind of file into a table. This plugin ships `StuttgartPopulationReader` for this
-    dataset, with a type for every column. (Any other GovData CSV file works with `GovDataReader`, which
-    reads every column as text.)
+    dataset, with a type for every column. (Other GovData CSV files with semicolons between values and one
+    header row work with `GovDataReader`, which reads every column as text.)
 
-    `peek` lists the columns you can ask for. It downloads the file, so this cell is the slow one; later
-    cells reuse the download.
+    `peek` lists the columns you can ask for. It downloads the file and keeps a copy on your disk.
     """)
     return
 
@@ -153,18 +156,18 @@ def _(mo):
 
 @app.cell
 def _(DATASET_ID, Feature, StuttgartPopulationReader, mloda):
-    options = {StuttgartPopulationReader: DATASET_ID}
-    result = mloda.run_all(
+    _options = {StuttgartPopulationReader: DATASET_ID}
+    _result = mloda.run_all(
         [
-            Feature("Stichtag", options=options),
-            Feature("Stadtbezirk", options=options),
-            Feature("Alter in 10 Gruppen", options=options),
-            Feature("Einwohner", options=options),
+            Feature("Stichtag", options=_options),
+            Feature("Stadtbezirk", options=_options),
+            Feature("Alter in 10 Gruppen", options=_options),
+            Feature("Einwohner", options=_options),
         ],
         compute_frameworks=["PyArrowTable"],
         column_ordering="request_order",
     )
-    population = result[0].to_pandas()
+    population = _result[0].to_pandas()
     population
     return (population,)
 
@@ -183,8 +186,9 @@ def _(mo):
     mo.md("""
     ## Pitfall: count each person once
 
-    The city counts its residents several times a year: two to five reference dates per year. Here is
-    the district Mitte in 2020, summed over the age groups:
+    The city counts its residents several times a year: up to five reference dates, four in most recent
+    years. Here is the district Mitte (the city centre) in 2020, summed over the age groups. pandas keeps
+    the reference dates as plain dates; `pd.to_datetime` lets us ask for their year, month and day.
     """)
     return
 
@@ -201,16 +205,17 @@ def _(pd, population):
 def _(mo):
     mo.md("""
     Each line is the whole district on one date. Adding up 2020 would count the same people four
-    times. So keep one date per year: 31 December. The year 2023 has only a March count, so it drops
-    out, and the series runs to 2022.
+    times. So keep one date per year: 31 December. The newest year can be incomplete (when this
+    tutorial was written, 2023 had only a March count); without a 31 December count it drops out.
     """)
     return
 
 
 @app.cell
-def _(pd, population):
+def _(mo, pd, population):
     _dates = pd.to_datetime(population["Stichtag"])
     year_end = population[(_dates.dt.month == 12) & (_dates.dt.day == 31)].assign(year=_dates.dt.year)
+    mo.md(f"The 31 December series runs from {year_end['year'].min()} to {year_end['year'].max()}.")
     return (year_end,)
 
 
@@ -226,8 +231,9 @@ def _(mo):
 
 @app.cell
 def _(mo, year_end):
+    _names = sorted(year_end["Stadtbezirk"].unique())
     district = mo.ui.dropdown(
-        options=sorted(year_end["Stadtbezirk"].unique()), value="Mitte", label="District (Stadtbezirk)"
+        options=_names, value="Mitte" if "Mitte" in _names else _names[0], label="District (Stadtbezirk)"
     )
     district
     return (district,)
@@ -250,7 +256,7 @@ def _(mo):
     ## Where the data came from
 
     Every published number needs its source. The catalog entry names the publisher and the license; the
-    download cache knows when you fetched the file.
+    copy on your disk records when you downloaded the file.
     """)
     return
 
@@ -268,10 +274,10 @@ def _(
     with build_client() as _client:
         _source = resolve_distribution(GovDataLocator(dataset_id=DATASET_ID), _client)
         with DownloadCache(StuttgartPopulationReader.cache_dir, client=_client) as _cache:
-            _retrieved = _cache.get_or_download(_source.url).retrieved_at
+            _retrieved = _cache.get_or_download(_source.url, revalidate=False).retrieved_at  # the copy read above
     _extras = _source.dataset.extras if _source.dataset else {}
     mo.md(f"""
-    - **Publisher:** {_extras.get("publisher_name")}
+    - **Publisher:** {_extras.get("publisher_name", "not given")}
     - **License:** {_source.license}
     - **Dataset page:** {_extras.get("uri")}
     - **File:** {_source.url}
@@ -285,8 +291,8 @@ def _(mo):
     mo.md("""
     The publisher is the statistics office of the city of Stuttgart (*Landeshauptstadt* means state
     capital). The license, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), lets you reuse the
-    data if you name the source, link the license and say whether you changed the data. Filtering to
-    31 December counts as a change.
+    data if you name the source, link the license and say whether you changed the data. Here, say that
+    you kept only 31 December and summed the age groups.
 
     ## Next
 
