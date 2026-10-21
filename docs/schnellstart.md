@@ -61,6 +61,7 @@ uv sync --all-extras
 Tutorials (englisch), je etwa 15 Minuten:
 
 1. [Your first table](../tutorials/01_first_table.py): einen GovData-Datensatz finden, seine Spalten ansehen, ihn einlesen. Ohne Konto. `uv run marimo edit tutorials/01_first_table.py`
+2. [Elections and air quality](../tutorials/02_elections_and_air_quality.py): die Ergebnisse der Bundestagswahl 2025 und stündliche Ozonwerte einlesen, jeden Reader über Optionen steuern. Ohne Konto. `uv run marimo edit tutorials/02_elections_and_air_quality.py`
 
 Demos: `uv run marimo edit demos/govdata_demo.py` führt durch alle Quellen, die Göttinger Reihe und eine Verknüpfung von Bevölkerung und Wahlberechtigten für alle Länder; ohne GENESIS-Zugang werden die Destatis-Kapitel übersprungen. `demos/berlin_wahl_2026_demo.py` liest vier Berliner Wahlen mit denselben Reader-Optionen.
 

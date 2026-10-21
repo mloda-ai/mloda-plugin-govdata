@@ -80,6 +80,7 @@ uv sync --all-extras
 Tutorials, about 15 minutes each:
 
 1. [Your first table](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/01_first_table.py): find a GovData dataset, see its columns, read it. No account. `uv run marimo edit tutorials/01_first_table.py`
+2. [Elections and air quality](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/02_elections_and_air_quality.py): read the 2025 Bundestag election results and hourly ozone, steering each reader with options. No account. `uv run marimo edit tutorials/02_elections_and_air_quality.py`
 
 Demos: `uv run marimo edit demos/govdata_demo.py` walks through every source, the Göttingen series, and a join of population and eligible voters for all 16 Länder; its Destatis chapters skip themselves without GENESIS credentials. `demos/berlin_wahl_2026_demo.py` reads four Berlin elections with one set of reader options.
 

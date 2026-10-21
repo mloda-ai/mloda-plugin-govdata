@@ -35,6 +35,7 @@ def test_globs_find_all_notebooks_and_docs() -> None:
         DEMO_PATH,
         DEMO_PATH.with_name("berlin_wahl_2026_demo.py"),
         REPO_ROOT / "tutorials" / "01_first_table.py",
+        REPO_ROOT / "tutorials" / "02_elections_and_air_quality.py",
     }
     assert expected <= set(NOTEBOOK_PATHS)
     assert {REPO_ROOT / "README.md", REPO_ROOT / "docs" / "schnellstart.md"} <= set(DOC_PATHS)

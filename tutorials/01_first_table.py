@@ -296,6 +296,8 @@ def _(mo):
 
     ## Next
 
+    [Tutorial 2](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/02_elections_and_air_quality.py)
+    reads election results and air measurements, steering each reader with options.
     [Readers](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/docs/readers.md) lists every
     source this plugin reads, how to search them and how to read any other GovData file.
     """)
