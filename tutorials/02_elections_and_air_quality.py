@@ -476,8 +476,9 @@ def _(mo):
 
     ## Next
 
-    The next tutorial reads a table from Destatis, the federal statistical office (it needs a free
-    account). [Readers](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/docs/readers.md)
+    [Tutorial 3](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/03_destatis_table.py)
+    reads a table from Destatis, the federal statistical office (it needs a free account).
+    [Readers](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/docs/readers.md)
     describes the election and air quality readers and their options.
     """)
     return

@@ -55,6 +55,6 @@ Tests marked `genesis_live` are deselected by default and skip with a visible re
 GENESIS_TOKEN=... pytest -m "live and genesis_live"
 ```
 
-## Demo
+## Notebooks
 
-The demo notebook's Destatis chapters resolve credentials the same way and skip themselves, naming the reason, when none are set.
+The demo notebook's Destatis chapters and the Destatis tutorial resolve credentials the same way and skip themselves, naming the reason, when none are set.
