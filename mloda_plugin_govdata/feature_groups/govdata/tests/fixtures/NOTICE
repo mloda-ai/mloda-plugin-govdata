@@ -31,7 +31,7 @@ Sample: header row plus the first 12 rows, unchanged.
 
 uba_measures.json
 Source: Umweltbundesamt Air Data API v4, measures endpoint (base https://luftdaten.umweltbundesamt.de/api/air-data/v4), station 143, component 3, scope 2, 2025-01-01. Publisher: Umweltbundesamt (UBA).
-Terms: per https://www.umweltbundesamt.de/datenschutz-haftung-urheberrecht, "Soweit nicht anders gekennzeichnet, ist die Nutzung von Daten im Sinne des § 12a EGovG zulässig", with attribution to the Umweltbundesamt as the source and a note of any changes; no license name is given for the API.
+Terms: per https://www.umweltbundesamt.de/datenschutz-haftung-urheberrecht (same wording on the Air Data site, https://luftdaten.umweltbundesamt.de/en/node/3), "Soweit nicht anders gekennzeichnet, ist die Nutzung von Daten im Sinne des § 12a EGovG zulässig", with attribution to the Umweltbundesamt as the source and a note of any changes; no license name is given for the API.
 Attribution: Umweltbundesamt, Luftdaten API v4
 Sample: unchanged response body.
 

@@ -27,7 +27,8 @@ from .core.parse import ColumnType
 from .reader import BaseGovDataReader
 
 UBA_AIR_BASE = "https://luftdaten.umweltbundesamt.de/api/air-data/v4"
-# No SPDX id exists for the UBA data terms (section 12a EGovG, attribution required), hence a LicenseRef- id.
+# UBA data terms (no SPDX id, hence LicenseRef-): use permitted under section 12a EGovG, name the UBA as source,
+# mark changes. https://luftdaten.umweltbundesamt.de/en/node/3
 UBA_LICENSE = "LicenseRef-UBA-EGovG-12a"
 
 OPTION_UBA_STATION = "govdata_uba_station"
