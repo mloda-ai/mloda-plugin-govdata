@@ -1,4 +1,4 @@
-"""The marimo demos must define their apps without running any cell (no network); demo and doc imports must exist."""
+"""Marimo notebooks must define their apps without running any cell; their imports and the docs' must exist."""
 
 import ast
 import importlib.util
@@ -11,10 +11,15 @@ from typing import TypeGuard
 import marimo
 import pytest
 
-DEMO_PATH = Path(__file__).resolve().parents[1] / "demos" / "govdata_demo.py"
-RECIPES_DIR = DEMO_PATH.parents[1] / "recipes"
-DEMO_PATHS = sorted(path for path in DEMO_PATH.parent.glob("*.py") if not path.name.startswith("_"))
-REPO_ROOT = DEMO_PATH.parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEMO_PATH = REPO_ROOT / "demos" / "govdata_demo.py"
+RECIPES_DIR = REPO_ROOT / "recipes"
+NOTEBOOK_PATHS = sorted(
+    path
+    for folder in ("demos", "tutorials")
+    for path in (REPO_ROOT / folder).glob("*.py")
+    if not path.name.startswith("_")
+)
 # Only unindented ```python fences, the one style the docs use.
 PYTHON_FENCE = re.compile(r"^```python\n(.*?)^```", re.MULTILINE | re.DOTALL)
 DOC_PATHS = [
@@ -24,13 +29,18 @@ DOC_PATHS = [
 ]
 
 
-def test_globs_find_all_demos_and_docs() -> None:
+def test_globs_find_all_notebooks_and_docs() -> None:
     # A silently empty glob must fail, not skip the parametrized tests.
-    assert {DEMO_PATH, DEMO_PATH.with_name("berlin_wahl_2026_demo.py")} <= set(DEMO_PATHS)
+    expected = {
+        DEMO_PATH,
+        DEMO_PATH.with_name("berlin_wahl_2026_demo.py"),
+        REPO_ROOT / "tutorials" / "01_first_table.py",
+    }
+    assert expected <= set(NOTEBOOK_PATHS)
     assert {REPO_ROOT / "README.md", REPO_ROOT / "docs" / "schnellstart.md"} <= set(DOC_PATHS)
 
 
-@pytest.mark.parametrize("demo_path", DEMO_PATHS, ids=lambda path: path.stem)
+@pytest.mark.parametrize("demo_path", NOTEBOOK_PATHS, ids=lambda path: str(path.relative_to(REPO_ROOT)))
 def test_demo_defines_marimo_app(demo_path: Path) -> None:
     spec = importlib.util.spec_from_file_location(demo_path.stem, demo_path)
     assert spec is not None
@@ -40,7 +50,7 @@ def test_demo_defines_marimo_app(demo_path: Path) -> None:
     assert isinstance(module.app, marimo.App)
 
 
-@pytest.mark.parametrize("path", DEMO_PATHS + DOC_PATHS, ids=lambda path: str(path.relative_to(REPO_ROOT)))
+@pytest.mark.parametrize("path", NOTEBOOK_PATHS + DOC_PATHS, ids=lambda path: str(path.relative_to(REPO_ROOT)))
 def test_every_mloda_name_it_imports_exists(path: Path) -> None:
     # Cell bodies and doc snippets never run here, so a moved module or a renamed export only shows up this way.
     imports = [

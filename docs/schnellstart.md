@@ -48,18 +48,21 @@ Die Landkreise Göttingen und Osterode am Harz wurden 2016 zusammengelegt. `valu
 03159  2016   327065.0  observed  []
 ```
 
-## Demo
+## Tutorials und Demos
 
-Ein [marimo](https://marimo.io)-Notebook führt durch alle Quellen, die Göttinger Reihe und eine Verknüpfung von Bevölkerung und Wahlberechtigten für alle Länder:
+Schritt-für-Schritt-Notebooks mit [marimo](https://marimo.io). Einmal einrichten:
 
 ```bash
 git clone https://github.com/mloda-ai/mloda-plugin-govdata.git
 cd mloda-plugin-govdata
 uv sync --all-extras
-uv run marimo edit demos/govdata_demo.py
 ```
 
-Ohne GENESIS-Zugang werden die Destatis-Kapitel übersprungen. Ein zweites Notebook, `demos/berlin_wahl_2026_demo.py`, liest vier Berliner Wahlen mit denselben Reader-Optionen.
+Tutorials (englisch), je etwa 15 Minuten:
+
+1. [Your first table](../tutorials/01_first_table.py): einen GovData-Datensatz finden, seine Spalten ansehen, ihn einlesen. Ohne Konto. `uv run marimo edit tutorials/01_first_table.py`
+
+Demos: `uv run marimo edit demos/govdata_demo.py` führt durch alle Quellen, die Göttinger Reihe und eine Verknüpfung von Bevölkerung und Wahlberechtigten für alle Länder; ohne GENESIS-Zugang werden die Destatis-Kapitel übersprungen. `demos/berlin_wahl_2026_demo.py` liest vier Berliner Wahlen mit denselben Reader-Optionen.
 
 ## Weiterlesen (englisch)
 

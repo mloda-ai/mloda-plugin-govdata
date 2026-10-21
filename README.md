@@ -67,18 +67,21 @@ Göttingen on today's borders, with `value__rebased` ([full example](https://git
 03159  2016   327065.0  observed  []
 ```
 
-## Demo
+## Tutorials and demos
 
-A [marimo](https://marimo.io) notebook walks through every source, the Göttingen series, and a join of population and eligible voters for all 16 Länder:
+Step-by-step [marimo](https://marimo.io) notebooks. Set up once:
 
 ```bash
 git clone https://github.com/mloda-ai/mloda-plugin-govdata.git
 cd mloda-plugin-govdata
 uv sync --all-extras
-uv run marimo edit demos/govdata_demo.py
 ```
 
-The Destatis chapters skip themselves without GENESIS credentials. A second notebook, `demos/berlin_wahl_2026_demo.py`, reads four Berlin elections with one set of reader options.
+Tutorials, about 15 minutes each:
+
+1. [Your first table](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/01_first_table.py): find a GovData dataset, see its columns, read it. No account. `uv run marimo edit tutorials/01_first_table.py`
+
+Demos: `uv run marimo edit demos/govdata_demo.py` walks through every source, the Göttingen series, and a join of population and eligible voters for all 16 Länder; its Destatis chapters skip themselves without GENESIS credentials. `demos/berlin_wahl_2026_demo.py` reads four Berlin elections with one set of reader options.
 
 ## Docs
 
