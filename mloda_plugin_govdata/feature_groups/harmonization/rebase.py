@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from dataclasses import asdict
+from functools import partial
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -13,7 +14,7 @@ from mloda.provider import DefaultOptionKeys, FeatureSet, property_spec
 from mloda.user import Feature, FeatureName, Options
 
 from ..govdata.core.cache import CacheMissError, DownloadCache
-from .base import OPTIONAL_PART, HarmonizationFeature
+from .base import OPTIONAL_PART, HarmonizationFeature, offline_first
 from .core.rebase import (
     DEFAULT_TOLERANCE,
     KeySheet,
@@ -79,14 +80,18 @@ class KreisRebaseFeature(HarmonizationFeature):
     }
 
     @classmethod
+    def _read_reference(cls, cache: DownloadCache, *, fetch: bool = False) -> list[UmsteigeschluesselRow]:
+        return offline_first(partial(load_bbsr_kreise, cache), fetch=fetch)
+
+    @classmethod
     def load_keys(cls) -> tuple[Sequence[UmsteigeschluesselRow], ReferenceSource]:
         """The BBSR Kreise key sheets from the offline cache and the source they are cited as."""
         with DownloadCache(Path(cls.cache_dir)) as cache:
             try:
-                return load_bbsr_kreise(cache), BBSR_KREISE
+                return cls._read_reference(cache), BBSR_KREISE
             except CacheMissError as exc:
                 raise CacheMissError(
-                    f"{exc}. Call load_bbsr_kreise(cache, revalidate=True) once to fetch and cache it. If the "
+                    f"{exc}. Call {cls.__name__}.fetch_reference() once to fetch and cache it. If the "
                     f"key sheet lives elsewhere, set HarmonizationFeature.cache_dir (or {cls.__name__}.cache_dir "
                     "for this group alone), independent of any reader's cache_dir."
                 ) from exc

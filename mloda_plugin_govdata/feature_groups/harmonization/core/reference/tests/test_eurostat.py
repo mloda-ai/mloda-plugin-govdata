@@ -1,7 +1,11 @@
 from pathlib import Path
 
+import pytest
+
+from mloda_plugin_govdata.feature_groups.govdata.core.cache import DownloadCache
 from mloda_plugin_govdata.feature_groups.harmonization.core.reference import eurostat
 from mloda_plugin_govdata.feature_groups.harmonization.core.reference.eurostat import (
+    load_lau_nuts_de,
     parse_lau_nuts_de_workbook,
     parse_nuts_correspondence_workbook,
 )
@@ -40,3 +44,11 @@ def test_lau_loader_docstring_documents_the_partial_validation_caveat() -> None:
     docstring = eurostat.parse_lau_nuts_de_workbook.__doc__ or ""
     assert "Cyprus" in docstring
     assert "validated" in docstring
+
+
+@pytest.mark.live
+def test_the_pinned_real_lau_file_maps_each_kreis_to_one_nuts3(tmp_path: Path) -> None:
+    with DownloadCache(tmp_path) as cache:
+        rows = load_lau_nuts_de(cache, revalidate=True)
+    pairs = {(row.lau_code[:5], row.nuts3) for row in rows}
+    assert len({kreis for kreis, _ in pairs}) == len({nuts3 for _, nuts3 in pairs}) == len(pairs) == 400

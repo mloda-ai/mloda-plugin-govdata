@@ -71,11 +71,10 @@ The wheel ships code only: no package data and no `tests` packages.
 
 - **Reference tables** (BBSR, GV-ISys, Eurostat) are third-party files (dl-de/by-2-0, CC BY 4.0); the
   Eurostat LAU-to-NUTS file alone is about 20 MB. A bundled subset would answer for the keys it holds and
-  report every other key as unmatched, indistinguishable from a real gap. Each is fetched once with its loader
-  (`load_bbsr_kreise(cache, revalidate=True)` and the like), checked against its pinned sha256 where
-  `core/reference/sources.py` has one (a body with another hash is refused, never cached), and read offline
-  afterwards; the FeatureGroups never fetch and raise
-  with the loader to call on an empty cache. Tests read
+  report every other key as unmatched, indistinguishable from a real gap. Each is fetched once with its group's
+  `fetch_reference()` (`KreisRebaseFeature.fetch_reference()` and the like), checked against its pinned sha256
+  where `core/reference/sources.py` has one (a body with another hash is refused, never cached), and read
+  offline afterwards; `calculate_feature` never fetches and raises with that call on an empty cache. Tests read
   small extracts in `feature_groups/harmonization/core/reference/tests/fixtures/`, each source and license
   named in the `NOTICE` there.
 - **Recipes** are data, not library code: each pins the payload sha256 and retrieval time of one run, and

@@ -193,10 +193,8 @@ def _(mo):
         DestatisReader,
         MissingCredentialsError,
     )
-    from mloda_plugin_govdata.feature_groups.govdata import CacheMissError, DownloadCache
     from mloda_plugin_govdata.feature_groups.harmonization import KreisRebaseFeature
     from mloda_plugin_govdata.feature_groups.harmonization.core.land_codes import check_land_names
-    from mloda_plugin_govdata.feature_groups.harmonization.core.reference.bbsr import load_bbsr_kreise
     from mloda_plugin_govdata.feature_groups.land_population_per_voter import LandPopulationPerVoter
     from mloda_plugin_govdata.recipes import frames_by_column, load_recipe
 
@@ -221,15 +219,12 @@ def _(mo):
         return mo.md(f"{sources}\n\n{recipe.compliance.notes or ''}")
 
     return (
-        CacheMissError,
         DestatisReader,
-        DownloadCache,
         KreisRebaseFeature,
         LandPopulationPerVoter,
         check_land_names,
         compliance_note,
         frames_by_column,
-        load_bbsr_kreise,
         load_recipe,
         recipes,
     )
@@ -318,12 +313,8 @@ def _(mo):
 
 
 @app.cell
-def _(CacheMissError, DownloadCache, KreisRebaseFeature, load_bbsr_kreise, load_recipe, mloda, recipes):
-    with DownloadCache(KreisRebaseFeature.cache_dir) as _cache:
-        try:
-            load_bbsr_kreise(_cache)
-        except CacheMissError:
-            load_bbsr_kreise(_cache, revalidate=True)
+def _(KreisRebaseFeature, load_recipe, mloda, recipes):
+    KreisRebaseFeature.fetch_reference()
     kreis_recipe = load_recipe(recipes / "kreis_population_rebased.json")
     rebased = mloda.run_all(kreis_recipe.features, compute_frameworks=["PyArrowTable"])[0].to_pandas()
     rebased.columns = [name.rpartition("~")[2] for name in rebased.columns]  # strip the feature-name prefix

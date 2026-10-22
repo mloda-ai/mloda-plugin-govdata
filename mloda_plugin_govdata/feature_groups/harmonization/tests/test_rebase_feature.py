@@ -24,6 +24,7 @@ from mloda_plugin_govdata.feature_groups.harmonization.core.rebase import (
     ShareKind,
     rebase,
 )
+from mloda_plugin_govdata.feature_groups.harmonization.core.reference.download import SourceIntegrityError
 from mloda_plugin_govdata.feature_groups.harmonization.rebase import KreisRebaseFeature
 from mloda_plugin_govdata.recipes import Compliance, SourceCompliance, build_recipe, parse_recipe, recipe_to_json
 
@@ -412,7 +413,33 @@ def test_a_land_table_is_refused_by_its_variable(genesis: Callable[[str], respx.
 
 def test_keys_missing_from_the_cache_name_the_fetch_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(KreisRebaseFeature, "cache_dir", str(tmp_path))
-    with pytest.raises(
-        CacheMissError, match="load_bbsr_kreise\\(cache, revalidate=True\\).*KreisRebaseFeature.cache_dir"
-    ):
+    with pytest.raises(CacheMissError, match="KreisRebaseFeature.fetch_reference\\(\\).*KreisRebaseFeature.cache_dir"):
         KreisRebaseFeature.load_keys()
+
+
+@pytest.mark.parametrize("cached", [True, False])
+def test_fetch_reference_reads_offline_first_and_fetches_once_on_a_miss(
+    cached: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[bool] = []
+
+    def load(cache: Any, *, revalidate: bool = False) -> list[Any]:
+        calls.append(revalidate)
+        if not (cached or revalidate):
+            raise CacheMissError("miss")
+        return []
+
+    monkeypatch.setattr("mloda_plugin_govdata.feature_groups.harmonization.rebase.load_bbsr_kreise", load)
+    monkeypatch.setattr(KreisRebaseFeature, "cache_dir", str(tmp_path))
+    KreisRebaseFeature.fetch_reference()
+    assert calls == ([False] if cached else [False, True])
+
+
+def test_fetch_reference_raises_a_drifted_upstream_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def load(cache: Any, *, revalidate: bool = False) -> list[Any]:
+        raise SourceIntegrityError("drifted") if revalidate else CacheMissError("miss")
+
+    monkeypatch.setattr("mloda_plugin_govdata.feature_groups.harmonization.rebase.load_bbsr_kreise", load)
+    monkeypatch.setattr(KreisRebaseFeature, "cache_dir", str(tmp_path))
+    with pytest.raises(SourceIntegrityError, match="drifted"):
+        KreisRebaseFeature.fetch_reference()

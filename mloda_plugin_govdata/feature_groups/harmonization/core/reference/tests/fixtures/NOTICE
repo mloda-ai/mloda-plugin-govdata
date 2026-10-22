@@ -73,6 +73,9 @@ every EU-27 country including DE is otherwise validated.
 Original: https://ec.europa.eu/eurostat/documents/345175/501971/EU-27-LAU-2025-NUTS-2024.xlsx/574c9e4a-2dae-99fe-5510-3fd18d8e90c2
 Fetched: 2026-08-17
 Original sha256: 983e75ed4ec38b716f9e3839a99cdc9a3e72e55c6473e24084ff13afee4e65e5
+Re-published 2026-09-28 at the same URL, sha256 9fd84ca59e36c2d494ccf0d7009f14feaa304a3943877c7d6533f736265aaf73
+(the current pin, set 2026-10-21): the DE sheet unchanged cell for cell, compared against the Wayback Machine capture of
+2026-08-13, whose body matches the original sha256; only the EL, CY, RO, NO and CH sheets differ.
 Extract sha256: f2e0734283885f364e30f787b4e5fd78f42090218f50f297efdea505b8227576
 License: Creative Commons Attribution 4.0 International (CC BY 4.0), same Eurostat copyright
 notice as above. Attribution: Source: Eurostat.

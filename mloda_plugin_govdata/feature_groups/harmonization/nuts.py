@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import Any, ClassVar, Literal, cast
 
@@ -10,7 +11,7 @@ from mloda.provider import DefaultOptionKeys, FeatureSet, property_spec
 from mloda.user import Feature, FeatureName, Options
 
 from ..govdata.core.cache import CacheMissError, DownloadCache
-from .base import OPTIONAL_PART, HarmonizationFeature
+from .base import OPTIONAL_PART, HarmonizationFeature, offline_first
 from .core.crosswalk import NUTS_VERSION, NutsCrosswalk, load_nuts_crosswalk
 from .core.nuts import map_ags_to_nuts
 from .core.reference.gv_isys import load_gv_isys_changes
@@ -47,18 +48,26 @@ class AgsToNutsFeature(HarmonizationFeature):
     history_years: ClassVar[tuple[int, ...]] = (2016,)
 
     @classmethod
+    def _read_reference(cls, cache: DownloadCache, *, fetch: bool = False) -> NutsCrosswalk:
+        changes = [
+            change
+            for year in cls.history_years
+            for change in offline_first(partial(load_gv_isys_changes, year, cache), fetch=fetch)
+        ]
+        return offline_first(partial(load_nuts_crosswalk, cache, gv_isys_changes=changes), fetch=fetch)
+
+    @classmethod
     def load_crosswalk(cls) -> NutsCrosswalk:
-        """The crosswalk plus the pinned history, from the offline cache; a miss names the fetch calls."""
+        """The crosswalk plus the pinned history, from the offline cache; a miss names the fetch call."""
         with DownloadCache(Path(cls.cache_dir)) as cache:
             try:
-                changes = [change for year in cls.history_years for change in load_gv_isys_changes(year, cache)]
-                return load_nuts_crosswalk(cache, gv_isys_changes=changes)
+                return cls._read_reference(cache)
             except CacheMissError as exc:
                 raise CacheMissError(
-                    f"{exc}. Call load_nuts_crosswalk(cache, revalidate=True) and load_gv_isys_changes(year, cache, "
-                    f"revalidate=True) for each year in {cls.history_years} once to fetch and cache them. If the "
-                    f"reference tables live elsewhere, set HarmonizationFeature.cache_dir (or {cls.__name__}."
-                    "cache_dir for this group alone), independent of any reader's cache_dir."
+                    f"{exc}. Call {cls.__name__}.fetch_reference() once to fetch and cache the crosswalk and the "
+                    f"GV-ISys change files for {cls.history_years}. If the reference tables live elsewhere, set "
+                    f"HarmonizationFeature.cache_dir (or {cls.__name__}.cache_dir for this group alone), "
+                    "independent of any reader's cache_dir."
                 ) from exc
 
     def input_features(self, options: Options, feature_name: FeatureName) -> set[Feature] | None:

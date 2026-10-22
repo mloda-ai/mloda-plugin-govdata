@@ -156,7 +156,7 @@ KREIS_POPULATION_REBASED = ShippedRecipe(
             "break inside the range. The Landkreise Göttingen (03152) and Osterode am Harz (03156) merged into the "
             "Landkreis Göttingen (03159) on 01.11.2016: before that Stichtag 03159 carries '-' (not applicable, "
             "never a zero) and its 2013 to 2015 rows are re-based sums of the two feeders. The BBSR key file must "
-            "be in the cache: load_bbsr_kreise(cache, revalidate=True) once."
+            "be in the cache: KreisRebaseFeature.fetch_reference() once."
         ),
     ),
 )

@@ -111,7 +111,7 @@ tests fail with a diff when a plan changes, a mloda upgrade included. Regenerate
 | `bundestagswahl_2025.json` | Bundeswahlleiterin `kerg.csv` | the merged-header election file |
 | `uba_ozone_station_143.json` | UBA Air Data JSON | hourly ozone at one station |
 
-The re-based recipe needs the BBSR key file in the cache (`load_bbsr_kreise(cache, revalidate=True)`
+The re-based recipe needs the BBSR key file in the cache (`KreisRebaseFeature.fetch_reference()`
 once). Running the Land recipe's own features returns them unjoined, one frame per source;
 `frames = frames_by_column(result)` picks a PyArrow frame by a column only it carries (`frames["value"]`,
 `frames["Nr"]`) and raises on a shared one, so for `kreis_foreigners_share.json`, whose two frames carry

@@ -29,19 +29,15 @@ GV-ISys changes) that `KreisRebaseFeature` and `AgsToNutsFeature` read; independ
 `BaseGovDataReader.cache_dir` (the reader's download cache), though both default to the same
 location. `AnnualPeriodFeature` inherits the attribute but reads no reference table. Set
 `HarmonizationFeature.cache_dir` itself, not one subclass's, to move every group's cache at once.
+`KreisRebaseFeature.fetch_reference()` and `AgsToNutsFeature.fetch_reference()` fill it: offline when the
+pinned files are cached, else fetched once; a file that no longer matches its pin raises.
 
 ```python
 from mloda.user import Feature, Options, mloda
 from mloda_plugin_govdata.feature_groups.destatis import DestatisReader
-from mloda_plugin_govdata.feature_groups.govdata import CacheMissError, DownloadCache
 from mloda_plugin_govdata.feature_groups.harmonization import KreisRebaseFeature  # registers the groups
-from mloda_plugin_govdata.feature_groups.harmonization.core.reference.bbsr import load_bbsr_kreise
 
-with DownloadCache(KreisRebaseFeature.cache_dir) as cache:
-    try:
-        load_bbsr_kreise(cache)  # offline: the cached key file, checked against its pinned sha256
-    except CacheMissError:
-        load_bbsr_kreise(cache, revalidate=True)  # first run: fetch it once
+KreisRebaseFeature.fetch_reference()  # the BBSR key file: fetched on the first run, read offline afterwards
 
 goettingen = {
     "name": "12411-0015",
@@ -101,7 +97,7 @@ Re-bases Kreis observations onto a later Gebietsstand with the BBSR Umsteigeschl
 (`mloda_plugin_govdata/feature_groups/harmonization/core/rebase.py`). Reads the ffcsv columns
 `1_variable_attribute_code` (variable block 1 must be `KREISE`), `time`, the value column and
 `value_marker`; the key sheet comes from the BBSR file in the cache
-(`load_bbsr_kreise(cache, revalidate=True)` once, offline afterwards).
+(`KreisRebaseFeature.fetch_reference()` once, offline afterwards).
 
 | Option | Meaning |
 | --- | --- |
@@ -142,11 +138,10 @@ row carries. Abridged (the cell is one line, the URL is cut, and only one record
 
 Maps AGS keys through the pinned Eurostat LAU-to-NUTS crosswalk
 (`mloda_plugin_govdata/feature_groups/harmonization/core/nuts.py`). The NUTS version is part of the name
-(or the `nuts_version` option) and must be the cached crosswalk's
-(`load_nuts_crosswalk(cache, revalidate=True)` once). Kreis keys retired before the crosswalk's
-Gebietsstand resolve through the GV-ISys change files named in `AgsToNutsFeature.history_years` (the
-pinned year, fetched once with `load_gv_isys_changes(year, cache, revalidate=True)`); Land keys are out
-of scope.
+(or the `nuts_version` option) and must be the cached crosswalk's. Kreis keys retired before the
+crosswalk's Gebietsstand resolve through the GV-ISys change files named in `AgsToNutsFeature.history_years`
+(the pinned year); Land keys are out of scope. `AgsToNutsFeature.fetch_reference()` fetches the crosswalk
+and the change files once.
 
 | Option | Meaning |
 | --- | --- |

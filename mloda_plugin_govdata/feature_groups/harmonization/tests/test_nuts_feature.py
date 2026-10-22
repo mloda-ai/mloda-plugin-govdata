@@ -161,10 +161,29 @@ def test_a_crosswalk_missing_from_the_cache_names_the_fetch_call(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(AgsToNutsFeature, "cache_dir", str(tmp_path))
-    with pytest.raises(
-        CacheMissError, match="load_nuts_crosswalk\\(cache, revalidate=True\\).*AgsToNutsFeature.cache_dir"
-    ):
+    with pytest.raises(CacheMissError, match="AgsToNutsFeature.fetch_reference\\(\\).*AgsToNutsFeature.cache_dir"):
         AgsToNutsFeature.load_crosswalk()
+
+
+def test_fetch_reference_fetches_only_the_file_missing_from_the_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[str, bool]] = []
+
+    def changes(year: int, cache: Any, *, revalidate: bool = False) -> list[Any]:
+        calls.append((f"gv-isys {year}", revalidate))
+        return []
+
+    def crosswalk(cache: Any, *, gv_isys_changes: Any = (), revalidate: bool = False) -> Any:
+        calls.append(("crosswalk", revalidate))
+        if not revalidate:
+            raise CacheMissError("miss")
+
+    monkeypatch.setattr("mloda_plugin_govdata.feature_groups.harmonization.nuts.load_gv_isys_changes", changes)
+    monkeypatch.setattr("mloda_plugin_govdata.feature_groups.harmonization.nuts.load_nuts_crosswalk", crosswalk)
+    monkeypatch.setattr(AgsToNutsFeature, "cache_dir", str(tmp_path))
+    AgsToNutsFeature.fetch_reference()
+    assert calls == [("gv-isys 2016", False), ("crosswalk", False), ("crosswalk", True)]
 
 
 @respx.mock
