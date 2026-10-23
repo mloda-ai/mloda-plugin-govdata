@@ -97,9 +97,9 @@ def test_children_carry_the_locator_and_leave_the_group_keys_behind() -> None:
 
 
 def test_the_destatis_reader_leaves_chained_names_to_the_derived_groups() -> None:
-    assert DestatisReader.match_subclass_data_access("12411-0015", ["value__rebased"], Options({})) is None
-    assert DestatisReader.match_subclass_data_access("12411-0015", ["kreise~edition"], Options({})) is None
-    assert DestatisReader.match_subclass_data_access("12411-0015", ["value"], Options({})) is not None
+    assert DestatisReader._source_locator("12411-0015", "value__rebased", Options({})) is None
+    assert DestatisReader._source_locator("12411-0015", "kreise~edition", Options({})) is None
+    assert DestatisReader._source_locator("12411-0015", "value", Options({})) is not None
 
 
 # --- Level 3: through mloda.run_all over the captured tables -------------------------------------
@@ -129,7 +129,7 @@ def test_goettingen_series_through_the_configuration_based_name(
     assert table.column(f"{CONFIGURATION_BASED_NAME}~marker").to_pylist() == [""] * 5
     assert route.calls.call_count == 1
     steps = [step.feature_group_name for step in result.plan if step.step_kind == "compute"]
-    assert steps == ["GovDataFeature", "KreisRebaseFeature"]
+    assert steps == ["DestatisReader", "KreisRebaseFeature"]
 
 
 @respx.mock

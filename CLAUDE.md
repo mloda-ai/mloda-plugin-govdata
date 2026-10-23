@@ -69,7 +69,7 @@ Consider generating project-specific skills for your own plugin repository to pr
 - **Type hints**: use modern forms (`list[str]`, `dict[str, int]`, `X | None`).
 - **Formatting**: ruff format with line length 120.
 - **Tests**: every new feature or bug fix must come with tests; follow the patterns in the existing `tests/` and `mloda_plugin_govdata/.../tests/` trees.
-- **Supply chain**: `[tool.uv] exclude-newer = "7 days"` in `pyproject.toml` defers new dependency releases by 7 days; `exclude-newer-package` pins mloda, mloda-testing, and mloda-registry to a longer window. Do not edit these without a reason.
+- **Supply chain**: `[tool.uv] exclude-newer = "7 days"` in `pyproject.toml` defers new dependency releases by 7 days; `exclude-newer-package` pins mloda to a longer window. Do not edit these without a reason.
 - **Commits**: use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`, `style:`, `ci:`, `build:`, `perf:`). semantic-release computes the next version: `feat:` triggers a minor bump, all other types trigger a patch bump (see `.releaserc.yaml`).
 
 ## Issue Creation

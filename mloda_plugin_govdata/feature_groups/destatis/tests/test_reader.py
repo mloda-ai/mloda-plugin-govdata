@@ -1,5 +1,6 @@
 """DestatisReader: locator dispatch, peek without credentials, end-to-end via mloda.run_all."""
 
+import inspect
 import subprocess
 import sys
 import textwrap
@@ -9,9 +10,8 @@ from typing import Any, cast
 import httpx
 import pytest
 import respx
-from mloda.provider import FeatureSet
+from mloda.provider import FeatureSet, SourceMatch
 from mloda.user import Feature, FeatureName, Options, mloda
-from mloda_plugins.feature_group.input_data.read_file import ReadFile
 
 from mloda_plugin_govdata.feature_groups.destatis.core.cache import ParameterCache
 from mloda_plugin_govdata.feature_groups.destatis.core.hosts import GENESIS_ONLINE
@@ -27,7 +27,7 @@ TOKEN = "t0kenAbCdEf0123456789abcdef012345"
 
 
 class _FakeFeatureSet:
-    """Just enough FeatureSet surface for load_data; mirrors govdata/tests/test_reader.py."""
+    """Just enough FeatureSet surface for load_neutral; mirrors govdata/tests/test_reader.py."""
 
     def __init__(self, names: set[str], options: Options | None = None) -> None:
         self._names = tuple(sorted(FeatureName(name) for name in names))
@@ -43,13 +43,18 @@ def _mock_tablefile(zip_bytes: bytes) -> respx.Route:
     )
 
 
-def test_destatis_reader_uses_the_shared_root_feature_group() -> None:
-    assert isinstance(GovDataFeature.input_data(), BaseGovDataReader)
+def _match(value: object) -> SourceMatch:
+    [match] = DestatisReader.find_sources(
+        DestatisReader.CLAIM_ROUTES[0], "value", Options({DestatisReader.__name__: value}), None
+    )
+    return match
 
 
-def test_destatis_reader_classifies_as_a_final_reader() -> None:
-    assert DestatisReader.final_reader_anchor() is ReadFile
-    assert DestatisReader.is_final_reader() is True
+def test_destatis_reader_is_a_concrete_source_group_under_the_shared_root() -> None:
+    assert issubclass(DestatisReader, BaseGovDataReader)
+    assert issubclass(DestatisReader, GovDataFeature)
+    assert not inspect.isabstract(DestatisReader)
+    assert DestatisReader.pointer_keys() == (DestatisReader.__name__,)
 
 
 def test_class_options_key_normalizes_to_reader_name() -> None:
@@ -58,7 +63,7 @@ def test_class_options_key_normalizes_to_reader_name() -> None:
 
 
 def test_destatis_option_never_yields_a_govdata_locator() -> None:
-    matched = DestatisReader.match_subclass_data_access(TABLE_CODE, ["value"], Options({}))
+    matched = DestatisReader._source_locator(TABLE_CODE, "value", Options({}))
     assert matched == DestatisLocator(TABLE_CODE)
     assert not isinstance(matched, GovDataLocator)
 
@@ -112,14 +117,14 @@ def test_load_data_level2_class_key_locator(
 def test_resolves_without_explicit_compute_framework(
     fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # As in govdata/tests/test_reader.py: GovDataFeature must not collide with the built-in ReadFileFeature,
+    # As in govdata/tests/test_reader.py: the reader must not collide with mloda's own source groups,
     # so run_all with no compute_frameworks pin still resolves to one group.
     monkeypatch.setattr(DestatisReader, "cache_dir", str(tmp_path))
     monkeypatch.setenv("GENESIS_TOKEN", TOKEN)
     zip_bytes = (fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes()
     _mock_tablefile(zip_bytes)
     result = mloda.run_all([Feature("value", options={DestatisReader.__name__: TABLE_CODE})])
-    assert result[0].num_rows == 207
+    assert len(result[0]) == 207
 
 
 @respx.mock
@@ -165,7 +170,7 @@ def test_peek_without_credentials_raises_on_a_cache_miss(tmp_path: Path, monkeyp
     ],
 )
 def test_data_access_identity_is_the_table_code(locator: DestatisLocator, identity: str) -> None:
-    assert DestatisReader.data_access_identity(locator) == identity
+    assert DestatisReader.data_access_identity(_match(locator)) == identity
 
 
 def _requiring_license(value: str) -> Feature:
@@ -219,7 +224,7 @@ def test_unknown_feature_names_available_columns(
     _mock_tablefile(zip_bytes)
     features = cast(FeatureSet, _FakeFeatureSet({"value", "not_a_column"}))
     with pytest.raises(ValueError) as excinfo:
-        DestatisReader.load_data(TABLE_CODE, features)
+        DestatisReader.load_neutral(_match(TABLE_CODE), features)
     message = str(excinfo.value)
     assert "Unknown feature(s) 'not_a_column'" in message
     assert "value" in message
@@ -260,7 +265,7 @@ _SUBPROCESS_SCRIPT = textwrap.dedent(
     table = result[0]
     assert table.num_rows == 207, table.num_rows
     compute_steps = [step for step in result.plan if step.step_kind == "compute"]
-    assert [step.feature_group_name for step in compute_steps] == ["GovDataFeature"], compute_steps
+    assert [step.feature_group_name for step in compute_steps] == ["DestatisReader"], compute_steps
     print("OK")
     """
 )

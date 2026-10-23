@@ -1,7 +1,7 @@
 """mloda reader for a GENESIS ``data/tablefile`` selection (ffcsv).
 
 Flow, on the shared ``BaseGovDataReader`` seam:
-    match_subclass_data_access  option value -> DestatisLocator; declines chained and ``~part`` names
+    _source_locator             pointer value -> DestatisLocator; declines chained and ``~part`` names
     _fetch                      locator.tablefile_fields() -> ParameterCache hit, or a
                                 GenesisClient POST on a miss (credentials: Options.context, then env)
     _parse                      zip on disk -> parse_ffcsv_zip -> typed Arrow table
@@ -35,22 +35,16 @@ class DestatisReader(BaseGovDataReader[DestatisLocator]):
     LICENSE: ClassVar[str | None] = DL_DE_BY_2_0
 
     @classmethod
-    def suffix(cls) -> tuple[str, ...]:
-        return (".zip",)
-
-    @classmethod
     def locator_type(cls) -> type[DestatisLocator]:
         return DestatisLocator
 
     @classmethod
-    def match_subclass_data_access(
-        cls, data_access: Any, feature_names: list[str], options: Any
-    ) -> DestatisLocator | None:
+    def _source_locator(cls, value: Any, feature_name: str, options: Options) -> DestatisLocator | None:
         # An ffcsv column never carries mloda's chain or part separator, so such a name (``value__rebased``,
-        # ``kreise~key``) belongs to a derived group; claiming it too would leave the request ambiguous.
-        if any(CHAIN_SEPARATOR in name or COLUMN_SEPARATOR in name for name in feature_names):
+        # ``kreise~key``) belongs to a derived group.
+        if CHAIN_SEPARATOR in feature_name or COLUMN_SEPARATOR in feature_name:
             return None
-        return super().match_subclass_data_access(data_access, feature_names, options)
+        return super()._source_locator(value, feature_name, options)
 
     @classmethod
     def _fetch(cls, locator: DestatisLocator, *, options: Options | None = None) -> FetchedPayload:

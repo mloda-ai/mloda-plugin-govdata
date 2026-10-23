@@ -242,7 +242,7 @@ def test_uba_reader_level2_with_non_default_time_and_lang(
 def test_invalid_uba_option_rejected_before_any_network_call(bad_option: str, bad_value: Any) -> None:
     options = dict(_demo_options())
     options[bad_option] = bad_value
-    with pytest.raises(ValueError, match=f"reader option '{bad_option}' value .* is rejected"):
+    with pytest.raises(ValueError, match=rf"UbaAirReader \(option value\).*'{bad_option}'"):
         mloda.run_all([Feature("value", options=options)], compute_frameworks=["PyArrowTable"])
 
 
@@ -250,7 +250,7 @@ def test_invalid_uba_option_rejected_before_any_network_call(bad_option: str, ba
 def test_missing_required_uba_option_rejected_before_any_network_call() -> None:
     options = dict(_demo_options())
     del options[OPTION_UBA_DATE_FROM]
-    with pytest.raises(ValueError, match="required reader option 'govdata_uba_date_from' is absent"):
+    with pytest.raises(ValueError, match=r"required option\(s\) govdata_uba_date_from are absent"):
         mloda.run_all([Feature("value", options=options)], compute_frameworks=["PyArrowTable"])
 
 
@@ -271,7 +271,7 @@ def test_missing_required_uba_option_rejected_before_any_network_call() -> None:
 def test_collection_value_rejected_before_any_network_call(collection_option: str, collection_value: list[Any]) -> None:
     options = dict(_demo_options())
     options[collection_option] = collection_value
-    with pytest.raises(ValueError, match=f"reader option '{collection_option}' value is a list.*scalar_only"):
+    with pytest.raises(ValueError, match=f"option '{collection_option}' must be a single value, got list"):
         mloda.run_all([Feature("value", options=options)], compute_frameworks=["PyArrowTable"])
 
 

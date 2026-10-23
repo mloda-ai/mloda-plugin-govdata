@@ -159,6 +159,6 @@ election date) is refused: the year a snapshot joins to is chosen where the join
 
 ## Over other readers
 
-`DestatisReader` leaves chained and `~part` names to these groups. The other readers claim any name their option
-key is set for, so a harmonized feature over them names its group: `Feature("Stichtag__year_period",
-options={StuttgartPopulationReader.__name__: slug}, feature_group=AnnualPeriodFeature)`.
+`DestatisReader` leaves chained and `~part` names to these groups. The other readers step aside for a chained
+name another group computes, so a harmonized feature over them needs no scope: `Feature("Stichtag__year_period",
+options={StuttgartPopulationReader.__name__: slug})`. A `feature_group=` scope naming another group than the reader pointer is refused.

@@ -1,6 +1,7 @@
 """Level 2 (recorded) and Level 3 (live) tests for the GovData reader."""
 
 import hashlib
+import inspect
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -11,9 +12,8 @@ import httpx
 import pyarrow as pa
 import pytest
 import respx
-from mloda.provider import FeatureSet
+from mloda.provider import FeatureSet, SourceMatch
 from mloda.user import DataType, Feature, FeatureName, Options, mloda
-from mloda_plugins.feature_group.input_data.read_file import ReadFile
 
 from mloda_plugin_govdata.feature_groups.govdata.bundeswahlleiterin import (
     OPTION_WAHL_HEADER_ROWS,
@@ -65,8 +65,14 @@ def _mock_population_endpoints(fixtures_dir: Path) -> None:
     respx.get(distribution_url).mock(return_value=httpx.Response(200, content=csv_bytes, headers={"ETag": '"v1"'}))
 
 
+def _match(reader: type[BaseGovDataReader[Any]], value: object) -> SourceMatch:
+    """The source a reader finds for one pointer value."""
+    [match] = reader.find_sources(reader.CLAIM_ROUTES[0], "a", Options({reader.__name__: value}), None)
+    return match
+
+
 class _FakeFeatureSet:
-    """Just enough FeatureSet surface for load_data: sorted tuple of FeatureName, like the real one."""
+    """Just enough FeatureSet surface for load_neutral: sorted tuple of FeatureName, like the real one."""
 
     def __init__(self, names: set[str], options: Options | None = None) -> None:
         self._names = tuple(sorted(FeatureName(name) for name in names))
@@ -116,8 +122,10 @@ class FakeReader(BaseGovDataReader[_FakeLocator]):
         return parse_german_csv(path, None)
 
 
-def test_feature_group_uses_base_govdata_reader() -> None:
-    assert isinstance(GovDataFeature.input_data(), BaseGovDataReader)
+def test_govdata_feature_is_the_abstract_root() -> None:
+    assert inspect.isabstract(GovDataFeature)
+    assert inspect.isabstract(BaseGovDataReader)
+    assert issubclass(BaseGovDataReader, GovDataFeature)
 
 
 def test_class_options_key_normalizes_to_reader_name() -> None:
@@ -148,7 +156,7 @@ def test_load_data_level2(fixtures_dir: Path, tmp_path: Path, monkeypatch: pytes
     assert table.schema.field("Einwohner").type == pa.int64()
     # RunResult.plan: the resolved execution steps name our group and framework.
     compute_steps = [step for step in result.plan if step.step_kind == "compute"]
-    assert [step.feature_group_name for step in compute_steps] == ["GovDataFeature"]
+    assert [step.feature_group_name for step in compute_steps] == ["StuttgartPopulationReader"]
     assert compute_steps[0].compute_framework_name == "PyArrowTable"
     assert set(compute_steps[0].requested_feature_names) == {"Einwohner", "Stadtbezirk"}
 
@@ -157,8 +165,8 @@ def test_load_data_level2(fixtures_dir: Path, tmp_path: Path, monkeypatch: pytes
 def test_resolves_without_explicit_compute_framework(
     fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Regression: GovDataFeature must not collide with the built-in ReadFileFeature,
-    # so a run_all call with no compute_frameworks pin still resolves to one group.
+    # The readers must not collide with mloda's own source groups, so a run_all call with no compute_frameworks
+    # pin still resolves to one group; the GovDataReader pointer stays with GovDataReader, not its Stuttgart subclass.
     monkeypatch.setattr(GovDataReader, "cache_dir", str(tmp_path))
     package_show = (fixtures_dir / "package_show.json").read_text(encoding="utf-8")
     csv_bytes = (fixtures_dir / "population_sample.csv").read_bytes()
@@ -167,7 +175,8 @@ def test_resolves_without_explicit_compute_framework(
     respx.get(distribution_url).mock(return_value=httpx.Response(200, content=csv_bytes, headers={"ETag": '"v1"'}))
 
     result = mloda.run_all([Feature("Einwohner", options={GovDataReader.__name__: SLUG})])
-    assert result[0].num_rows == 1000
+    assert len(result[0]) == 1000
+    assert [step.feature_group_name for step in result.plan if step.step_kind == "compute"] == ["GovDataReader"]
 
 
 @pytest.mark.live
@@ -306,7 +315,7 @@ def test_bad_geometry_option_raises(fixtures_dir: Path) -> None:
 )
 @respx.mock
 def test_invalid_geometry_option_rejected_before_any_network_call(bad_option: str, bad_value: Any) -> None:
-    with pytest.raises(ValueError, match=f"reader option '{bad_option}' value .* is rejected"):
+    with pytest.raises(ValueError, match=rf"BundeswahlleiterinReader \(option value\).*'{bad_option}'"):
         mloda.run_all(
             [Feature("Gebiet", options={BundeswahlleiterinReader.__name__: KERG_URL, bad_option: bad_value})],
             compute_frameworks=["PyArrowTable"],
@@ -326,9 +335,9 @@ def test_invalid_geometry_option_rejected_before_any_network_call(bad_option: st
 def test_geometry_collection_value_rejected_before_any_network_call(
     collection_option: str, collection_value: list[Any]
 ) -> None:
-    # Each element is valid alone; scalar_only refuses the list at match time anyway.
+    # Each element is valid alone; the single-value guard refuses the list at match time anyway.
     options = {BundeswahlleiterinReader.__name__: KERG_URL, collection_option: collection_value}
-    with pytest.raises(ValueError, match=f"reader option '{collection_option}' value is a list.*scalar_only"):
+    with pytest.raises(ValueError, match=f"option '{collection_option}' must be a single value, got list"):
         mloda.run_all([Feature("Gebiet", options=options)], compute_frameworks=["PyArrowTable"])
 
 
@@ -405,7 +414,7 @@ def test_describe_columns_types_what_peek_lists(
 ) -> None:
     monkeypatch.setattr(StuttgartPopulationReader, "cache_dir", str(tmp_path))
     _mock_population_endpoints(fixtures_dir)
-    assert StuttgartPopulationReader.describe_columns(SLUG) == {
+    assert StuttgartPopulationReader.describe_columns(_match(StuttgartPopulationReader, SLUG)) == {
         "Stichtag": DataType.DATE,
         "Stadtbezirk": DataType.STRING,
         "Alter in 10 Gruppen": DataType.STRING,
@@ -414,7 +423,7 @@ def test_describe_columns_types_what_peek_lists(
 
 
 @pytest.mark.parametrize(
-    ("reader", "data_access", "identity"),
+    ("reader", "value", "identity"),
     [
         (GovDataReader, GovDataLocator(dataset_id=SLUG), SLUG),
         (BundeswahlleiterinReader, GovDataLocator.from_string(KERG_URL), KERG_URL),
@@ -424,13 +433,20 @@ def test_describe_columns_types_what_peek_lists(
             "https://example.org/a.csv",
         ),
         (FakeReader, _FakeLocator("x"), "fake:x"),
-        (GovDataReader, 123, "int"),  # not a locator: mloda's default
     ],
 )
 def test_data_access_identity_names_the_dataset_never_a_url_query(
-    reader: type[BaseGovDataReader[Any]], data_access: object, identity: str
+    reader: type[BaseGovDataReader[Any]], value: object, identity: str
 ) -> None:
-    assert reader.data_access_identity(data_access) == identity
+    assert reader.data_access_identity(_match(reader, value)) == identity
+
+
+def test_sources_keep_the_full_selection() -> None:
+    # Two query windows share an identity label but must stay two sources.
+    first = _match(GovDataReader, "https://example.org/a.csv?year=2024")
+    second = _match(GovDataReader, "https://example.org/a.csv?year=2025")
+    assert first != second
+    assert GovDataReader.data_access_identity(first) == GovDataReader.data_access_identity(second)
 
 
 @pytest.mark.parametrize(
@@ -459,15 +475,12 @@ def test_a_required_license_refuses_a_reader_that_declares_none() -> None:
 
 
 @pytest.mark.parametrize(
-    "reader",
-    [BaseGovDataReader, GovDataReader, StuttgartPopulationReader, BundeswahlleiterinReader, UbaAirReader, FakeReader],
+    "reader", [GovDataReader, StuttgartPopulationReader, BundeswahlleiterinReader, UbaAirReader, FakeReader]
 )
-def test_readers_classify_as_final_readers(reader: type[BaseGovDataReader[Any]]) -> None:
-    # mloda classifies readers structurally: overriding load_data wholesale
-    # relative to the ReadFile anchor makes each reader final; the ReadFile base is not.
-    assert reader.final_reader_anchor() is ReadFile
-    assert reader.is_final_reader() is True
-    assert ReadFile.is_final_reader() is False
+def test_readers_are_concrete_source_groups_answering_to_their_own_name(reader: type[BaseGovDataReader[Any]]) -> None:
+    # Own name only: a parent's pointer (GovDataReader) must not route to a subclass (StuttgartPopulationReader).
+    assert not inspect.isabstract(reader)
+    assert reader.pointer_keys() == (reader.__name__,)
 
 
 @respx.mock
@@ -478,7 +491,7 @@ def test_unknown_feature_names_available_columns(
     _mock_population_endpoints(fixtures_dir)
     features = cast(FeatureSet, _FakeFeatureSet({"Einwohner_", "Stadtbezirk"}))
     with pytest.raises(ValueError) as excinfo:
-        GovDataReader.load_data(SLUG, features)
+        GovDataReader.load_neutral(_match(GovDataReader, SLUG), features)
     message = str(excinfo.value)
     assert "Unknown feature(s) 'Einwohner_'" in message
     assert "Available: Alter in 10 Gruppen, Einwohner, Stadtbezirk, Stichtag." in message
@@ -494,7 +507,7 @@ def test_unknown_feature_message_prints_plain_names(
     _mock_population_endpoints(fixtures_dir)
     features = cast(FeatureSet, _FakeFeatureSet({"Nr", "Stadtbezirk"}))
     with pytest.raises(ValueError) as excinfo:
-        GovDataReader.load_data(SLUG, features)
+        GovDataReader.load_neutral(_match(GovDataReader, SLUG), features)
     message = str(excinfo.value)
     assert "Unknown feature(s) 'Nr'" in message
     assert "FeatureName" not in message
@@ -508,7 +521,7 @@ def test_unknown_feature_suggestion_only_for_close_matches(
     _mock_population_endpoints(fixtures_dir)
     features = cast(FeatureSet, _FakeFeatureSet({"Einwohner_", "zzzzz"}))
     with pytest.raises(ValueError) as excinfo:
-        GovDataReader.load_data(SLUG, features)
+        GovDataReader.load_neutral(_match(GovDataReader, SLUG), features)
     message = str(excinfo.value)
     assert "Unknown feature(s) 'Einwohner_', 'zzzzz'" in message
     assert message.count("Did you mean") == 1  # no suggestion for 'zzzzz'
@@ -516,13 +529,13 @@ def test_unknown_feature_suggestion_only_for_close_matches(
 
 
 def test_fake_reader_option_never_yields_govdata_locator() -> None:
-    fake_locator = FakeReader.match_subclass_data_access("x", ["a"], Options({}))
+    fake_locator = FakeReader._source_locator("x", "a", Options({}))
     assert fake_locator == _FakeLocator("x")
     assert not isinstance(fake_locator, GovDataLocator)
     assert FakeReader._coerce_locator("x") == _FakeLocator("x")
-    assert FakeReader.match_subclass_data_access(123, ["a"], Options({})) is None
-    assert isinstance(GovDataReader.match_subclass_data_access("x", ["a"], Options({})), GovDataLocator)
-    assert FakeReader.match_subclass_data_access(_FakeLocator("x"), ["a"], Options({})) == _FakeLocator("x")
+    assert FakeReader._source_locator(123, "a", Options({})) is None
+    assert isinstance(GovDataReader._source_locator("x", "a", Options({})), GovDataLocator)
+    assert FakeReader._source_locator(_FakeLocator("x"), "a", Options({})) == _FakeLocator("x")
     assert FakeReader._coerce_locator(_FakeLocator("x")) == _FakeLocator("x")
 
 
@@ -548,15 +561,16 @@ def test_unknown_feature_message_uses_locator_describe(tmp_path: Path, monkeypat
     monkeypatch.setattr(FakeReader, "cache_dir", str(tmp_path))
     features = cast(FeatureSet, _FakeFeatureSet({"zz"}))
     with pytest.raises(ValueError) as excinfo:
-        FakeReader.load_data("x", features)
+        FakeReader.load_neutral(_match(FakeReader, "x"), features)
     message = str(excinfo.value)
     assert "'fake:x'" in message
     assert "Available: a, b." in message
 
 
 def test_base_reader_declines_unusable_data_access() -> None:
-    assert BaseGovDataReader.match_subclass_data_access(object(), ["a"], Options({})) is None
-    assert isinstance(BaseGovDataReader.match_subclass_data_access(SLUG, ["a"], Options({})), GovDataLocator)
+    assert BaseGovDataReader._source_locator(object(), "a", Options({})) is None
+    assert isinstance(BaseGovDataReader._source_locator(SLUG, "a", Options({})), GovDataLocator)
+    assert GovDataReader.find_sources(GovDataReader.CLAIM_ROUTES[0], "a", Options({"other": SLUG}), None) == []
 
 
 @respx.mock

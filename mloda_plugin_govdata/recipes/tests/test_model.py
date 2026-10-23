@@ -96,7 +96,10 @@ def test_features_must_be_a_non_empty_array() -> None:
 
 def test_an_unknown_key_inside_a_feature_item_names_it_and_the_allowed_keys() -> None:
     error = _rejects(_recipe(features=[{"name": "value", "bogus": 1}]), r"features\[0\]: unknown key\(s\) \['bogus'\]")
-    assert "'column_index', 'context_options', 'feature_group', 'group_options', 'in_features', 'name'" in str(error)
+    assert (
+        "'column_index', 'context_options', 'feature_group', 'group_options', 'implementation', 'in_features', 'name'"
+        in str(error)
+    )
 
 
 def test_feature_item_types_are_checked() -> None:

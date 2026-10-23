@@ -46,6 +46,7 @@ class FeatureItem(BaseModel):
     cascade_context_keys: list[str] | None = None
     column_index: int | None = None
     feature_group: str | None = None
+    implementation: str | list[str] | None = None
 
     @model_validator(mode="after")
     def _mloda_rules(self) -> FeatureItem:

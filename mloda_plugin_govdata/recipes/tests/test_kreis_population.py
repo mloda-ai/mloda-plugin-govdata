@@ -55,7 +55,7 @@ def test_the_recipe_runs_to_the_expected_cells(recipes_dir: Path, genesis: Genes
     ] == expected
     assert route.calls.call_count == 1
     steps = [step.feature_group_name for step in result.plan if step.step_kind == "compute"]
-    assert steps == ["GovDataFeature", "KreisRebaseFeature"]
+    assert steps == ["DestatisReader", "KreisRebaseFeature"]
 
 
 @respx.mock

@@ -1,5 +1,5 @@
-"""The consumer FeatureGroup a same-class ``GovDataFeature`` link needs: mloda executes such a join
-only when a consumer needs a column from each side."""
+"""The consumer FeatureGroup the Destatis-to-kerg link needs: mloda executes a join only when a consumer
+needs a column from each side."""
 
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ from mloda.user.pyarrow import PyArrowTable
 from .destatis.core.period import stichtag_period
 from .destatis.reader import DestatisReader
 from .govdata.bundeswahlleiterin import BundeswahlleiterinReader
-from .govdata.feature import GovDataFeature
 from .harmonization.core.land_codes import land_name
 
 # GENESIS-Online 12411-0010 (Bevölkerung nach Ländern) at the last Stichtag on or before the
@@ -28,10 +27,8 @@ VOTERS = "Wahlberechtigte Erststimmen Endgültig"
 PARTS: tuple[str, ...] = ("code", "land", "population", "voters", "value")
 
 LAND_LINK = Link.inner(
-    JoinSpec(GovDataFeature, "1_variable_attribute_code"),
-    JoinSpec(GovDataFeature, "Nr"),
-    left_discriminator={DestatisReader.__name__: LAND_LOCATOR},
-    right_discriminator={BundeswahlleiterinReader.__name__: KERG_URL},
+    JoinSpec(DestatisReader, "1_variable_attribute_code"),
+    JoinSpec(BundeswahlleiterinReader, "Nr"),
 )
 
 

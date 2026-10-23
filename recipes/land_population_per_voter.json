@@ -85,26 +85,16 @@
     {
       "join": "inner",
       "left": {
-        "feature_group": "GovDataFeature",
+        "feature_group": "DestatisReader",
         "index": [
           "1_variable_attribute_code"
-        ],
-        "discriminator": {
-          "DestatisReader": {
-            "name": "12411-0010",
-            "startyear": 2024,
-            "endyear": 2024
-          }
-        }
+        ]
       },
       "right": {
-        "feature_group": "GovDataFeature",
+        "feature_group": "BundeswahlleiterinReader",
         "index": [
           "Nr"
-        ],
-        "discriminator": {
-          "BundeswahlleiterinReader": "https://www.bundeswahlleiterin.de/bundestagswahlen/2025/ergebnisse/opendata/btw25/csv/kerg.csv"
-        }
+        ]
       }
     }
   ],

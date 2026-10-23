@@ -20,7 +20,9 @@ from .model import Compliance, JoinSide, LinkSpec, Recipe, RecipeError, error_su
 IN_FEATURES = "in_features"
 # Feature constructor parameters the mloda feature config can carry (the rest must be at their defaults).
 # domain rides in the "domain" option key: mloda reads it from there and pops it on construction.
-SUPPORTED_FEATURE_PARAMETERS: frozenset[str] = frozenset({"name", "options", "link", "feature_group", "domain"})
+SUPPORTED_FEATURE_PARAMETERS: frozenset[str] = frozenset(
+    {"name", "options", "link", "feature_group", "domain", "implementation"}
+)
 # Attribute name, its default, and the option key mloda also reads it from (then it round-trips with the options).
 _UNSUPPORTED: tuple[tuple[str, Any, str | None], ...] = (
     ("data_type", None, None),
@@ -31,6 +33,8 @@ _UNSUPPORTED: tuple[tuple[str, Any, str | None], ...] = (
     ("forward_group_exclude", frozenset(), None),
     ("inherit_context_keys", frozenset(), None),
     ("required_declarations", None, None),
+    ("keep_index", False, None),
+    ("_connection_holder", None, None),
 )
 
 
@@ -86,8 +90,8 @@ def _feature_item(feature: Feature, position: int) -> dict[str, Any]:
         if _same(value, default) or (option_key is not None and _same(value, getattr(from_options, attribute))):
             continue
         raise RecipeError(
-            f"{where}: Feature.{attribute} has no field in the mloda feature config; "
-            "a recipe carries name, options, in_features, feature_group, propagate_context_keys, "
+            f"{where}: Feature.{attribute} has no recipe form; "
+            "a recipe carries name, options, in_features, feature_group, implementation, propagate_context_keys, "
             "and cascade_context_keys"
         )
     if IN_FEATURES in options.group:
@@ -119,6 +123,9 @@ def _feature_item(feature: Feature, position: int) -> dict[str, Any]:
     scope = feature.feature_group_scope
     if scope is not None:
         item["feature_group"] = scope if isinstance(scope, str) else scope.get_class_name()
+    pin = feature.implementation_pin
+    if pin is not None:
+        item["implementation"] = pin[0] if len(pin) == 1 else list(pin)
     return item
 
 

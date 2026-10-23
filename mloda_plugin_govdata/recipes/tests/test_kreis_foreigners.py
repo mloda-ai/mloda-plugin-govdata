@@ -7,7 +7,6 @@ from typing import Any
 
 import respx
 
-from mloda_plugin_govdata.feature_groups.destatis import DestatisReader
 from mloda_plugin_govdata.recipes import load_recipe
 from scripts.write_recipes import FOREIGNERS, GOETTINGEN, KEY, KREIS_FOREIGNERS_SHARE
 
@@ -29,8 +28,9 @@ def _frames(recipes_dir: Path) -> tuple[Rows, Rows]:
     result = run(load_recipe(recipes_dir / KREIS_FOREIGNERS_SHARE.file).features)
     by_table = {}
     for step, frame in result.frames():
-        assert step.feature_set_options is not None, step
-        by_table[step.feature_set_options.group[DestatisReader.__name__]["name"]] = frame
+        # The table code: mloda masks a dict pointer's values in the step options.
+        assert step.data_access_identity is not None, step
+        by_table[step.data_access_identity] = frame
     assert len(by_table) == 2, by_table
     foreigners, population = by_table[FOREIGNERS["name"]], by_table[GOETTINGEN["name"]]
     assert (foreigners.num_rows, population.num_rows) == (45, 15)

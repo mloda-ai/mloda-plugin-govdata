@@ -1,23 +1,23 @@
-"""Base mloda reader for GovData distributions.
+"""Base mloda source group for GovData distributions.
 
-``BaseGovDataReader`` follows the ``CsvReader`` pattern (a ``ReadFile`` subclass). Every reader
-flows ``load_data -> _read_table -> _fetch -> _parse``: coerce a locator, fetch the payload through
-the cache, parse it into a typed Arrow table. One module per data source implements ``_parse``;
+Each reader is a pointed-only ``SourceFeatureGroup``: ``options={Reader: value}`` makes ``find_sources`` coerce
+the value into a locator, and ``load_neutral -> _read_table -> _fetch -> _parse`` fetches the payload through
+the cache and parses it into a typed Arrow table. One module per data source implements ``_parse``;
 ``GovDataReader`` is the generic single-header German-CSV reader.
 """
 
 from __future__ import annotations
 
 import difflib
+from abc import abstractmethod
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, ClassVar, Generic, TypeVar, cast
 
 import pyarrow as pa
-from mloda.provider import FeatureSet
-from mloda.user import DataType, Options
+from mloda.provider import ClaimRoute, FeatureSet, NamePolicy, SourceMatch, scrub_credentials
+from mloda.user import DataAccessCollection, DataType, Options
 from mloda.user.pyarrow import PyArrowTable  # noqa: F401
-from mloda_plugins.feature_group.input_data.read_file import ReadFile
 
 from .core.cache import DEFAULT_CACHE_DIR, DownloadCache
 from .core.client import build_client
@@ -25,6 +25,7 @@ from .core.discovery import resolve_distribution
 from .core.locator import GovDataLocator, Locator
 from .core.parse import ColumnType, parse_german_csv
 from .core.provenance import FetchedPayload, Provenance
+from .feature import GovDataFeature
 
 LocatorT = TypeVar("LocatorT", bound=Locator)
 
@@ -43,21 +44,29 @@ def _unknown_features_message(missing: list[str], available: list[str], locator:
     return " ".join(parts)
 
 
-class BaseGovDataReader(ReadFile, Generic[LocatorT]):
+def is_scalar(value: Any) -> bool:
+    """Match guard for single-valued options: mloda would otherwise validate a collection element-wise."""
+    return not isinstance(value, (list, tuple, set, frozenset))
+
+
+class BaseGovDataReader(GovDataFeature, Generic[LocatorT]):
     """Plumbing shared by every GovData reader, generic over its locator type.
 
     The base handles GovData locators; a reader over another locator type overrides
     ``locator_type`` and ``_fetch``. Every reader implements ``_parse``.
     """
 
+    # Pointed only: a reader claims a feature when its class (or class name) is an option key; matching never fetches.
+    CLAIM_ROUTES: ClassVar[tuple[ClaimRoute, ...]] = (ClaimRoute("locator", NamePolicy.OPEN, searched=False),)
     # Persistent, content-addressed cache location (override per environment).
     cache_dir: ClassVar[str] = str(DEFAULT_CACHE_DIR)
     # The one license every payload of this reader carries, as normalize_license labels it; None when it varies.
     LICENSE: ClassVar[str | None] = None
 
     @classmethod
-    def suffix(cls) -> tuple[str, ...]:
-        return (".csv",)
+    def pointer_keys(cls) -> tuple[str, ...]:
+        # Own name only: mloda would also route a parent reader's key to a subclass with another schema or license.
+        return (cls.__name__,)
 
     @classmethod
     def locator_type(cls) -> type[LocatorT]:
@@ -65,24 +74,35 @@ class BaseGovDataReader(ReadFile, Generic[LocatorT]):
         return cast("type[LocatorT]", GovDataLocator)
 
     @classmethod
-    def _coerce_or_none(cls, data_access: Any) -> LocatorT | None:
+    def _coerce_or_none(cls, value: Any) -> LocatorT | None:
         locator_type = cls.locator_type()
-        if isinstance(data_access, locator_type):
-            return data_access
-        return locator_type.coerce(data_access)
+        if isinstance(value, locator_type):
+            return value
+        return locator_type.coerce(value)
 
     @classmethod
-    def match_subclass_data_access(cls, data_access: Any, feature_names: list[str], options: Any) -> LocatorT | None:
-        return cls._coerce_or_none(data_access)
+    def _source_locator(cls, value: Any, feature_name: str, options: Options) -> LocatorT | None:
+        """The locator a pointer value selects for this feature, None to decline."""
+        return cls._coerce_or_none(value)
 
     @classmethod
-    def load_data(cls, data_access: Any, features: FeatureSet) -> Any:
-        # Overriding load_data wholesale classifies this as a final reader (mloda's is_final_reader,
-        # structural, no runtime probe).
-        # get_all_names() is a sorted tuple (deterministic column order) of FeatureName, a str subclass;
-        # normalized so messages print plain names.
+    def find_sources(
+        cls,
+        route: ClaimRoute,
+        feature_name: str,
+        options: Options,
+        data_access_collection: DataAccessCollection | None,
+    ) -> list[SourceMatch]:
+        key = next((key for key in cls.pointer_keys() if key in options), None)
+        locator = None if key is None else cls._source_locator(options.get(key), feature_name, options)
+        # The full selection is the source, so different years or query windows stay different sources.
+        return [] if locator is None else [SourceMatch(source=repr(locator), access=locator)]
+
+    @classmethod
+    def load_neutral(cls, match: SourceMatch, features: FeatureSet) -> Any:
+        # get_all_names() is sorted (deterministic column order); str() so messages print plain names.
         requested = [str(name) for name in features.get_all_names()]
-        locator = cls._coerce_locator(data_access)
+        locator = match.access
         table = cls._read_table(locator, features.options)
         available = set(table.column_names)
         missing = [name for name in requested if name not in available]
@@ -91,30 +111,28 @@ class BaseGovDataReader(ReadFile, Generic[LocatorT]):
         return table.select(requested)
 
     @classmethod
-    def peek(cls, data_access: Any) -> dict[str, str]:
-        """Columns selectable as features for this locator, as name to Arrow type.
+    def peek(cls, value: Any) -> dict[str, str]:
+        """Columns selectable as features for a pointer value, as name to Arrow type.
 
         Downloads through the cache, so a following feature request reuses the file.
         """
-        table = cls._read_table(cls._coerce_locator(data_access))
+        table = cls._read_table(cls._coerce_locator(value))
         return {field.name: str(field.type) for field in table.schema}
 
     @classmethod
-    def describe_columns(cls, data_access: Any) -> dict[str, DataType | None]:
+    def describe_columns(cls, match: SourceMatch) -> dict[str, DataType | None]:
         """``peek`` as mloda's column discovery (lineage extenders call it); downloads through the cache too."""
-        table = cls._read_table(cls._coerce_locator(data_access))
+        table = cls._read_table(match.access)
         return {field.name: DataType.from_arrow_type_safe(field.type) for field in table.schema}
 
     @classmethod
-    def data_access_identity(cls, data_access: Any) -> str:
+    def data_access_identity(cls, match: SourceMatch) -> str:
         """The dataset name in lineage and audit records: the locator label, a URL cut to scheme, host and path.
 
-        mloda's default names every locator by its type alone. The selection (years, keys, a URL query) is left out.
+        The selection (years, keys, a URL query) is left out.
         """
-        if not isinstance(data_access, cls.locator_type()):
-            return super().data_access_identity(data_access)
-        label = data_access.describe()
-        return super().data_access_identity(label) if label.startswith(("http://", "https://")) else label
+        label = match.access.describe()
+        return scrub_credentials(label) if label.startswith(("http://", "https://")) else label
 
     @classmethod
     def declared_attributes(cls, features: FeatureSet | None) -> Mapping[str, str | int | float | bool]:
@@ -122,10 +140,15 @@ class BaseGovDataReader(ReadFile, Generic[LocatorT]):
         return {"license": cls.LICENSE} if cls.LICENSE else {}
 
     @classmethod
-    def _coerce_locator(cls, data_access: Any) -> LocatorT:
-        locator = cls._coerce_or_none(data_access)
+    def _option(cls, key: str, options: Options | None) -> Any:
+        """``read_option`` that also serves ``peek``, which has no feature options."""
+        return cls.read_option(key, options if options is not None else Options())
+
+    @classmethod
+    def _coerce_locator(cls, value: Any) -> LocatorT:
+        locator = cls._coerce_or_none(value)
         if locator is None:
-            raise ValueError(f"{cls.__name__} cannot handle data access {data_access!r}")
+            raise ValueError(f"{cls.__name__} cannot handle data access {value!r}")
         return locator
 
     @classmethod
@@ -154,8 +177,9 @@ class BaseGovDataReader(ReadFile, Generic[LocatorT]):
         )
 
     @classmethod
+    @abstractmethod
     def _parse(cls, path: Path, locator: LocatorT, *, options: Options | None = None) -> pa.Table:
-        raise NotImplementedError(f"{cls.__name__} must implement _parse")
+        """Parse the fetched payload into a typed Arrow table."""
 
 
 class GovDataReader(BaseGovDataReader[GovDataLocator]):

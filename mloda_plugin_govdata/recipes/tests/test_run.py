@@ -80,7 +80,7 @@ _REBASE_SCRIPT = textwrap.dedent(
     values = result[0].column("destatis__bevoelkerung__kreise~value").to_pylist()
     assert values == [322616.0, 324013.0, 329538.0, 327065.0, 328036.0], values
     steps = [step.feature_group_name for step in result.plan if step.step_kind == "compute"]
-    assert steps == ["GovDataFeature", "KreisRebaseFeature"], steps
+    assert steps == ["DestatisReader", "KreisRebaseFeature"], steps
     print("OK")
     """
 )
@@ -93,14 +93,15 @@ _LINK_SCRIPT = textwrap.dedent(
     recipe = load_recipe(sys.argv[1])
 
     from mloda.user import Feature
-    from mloda_plugin_govdata.feature_groups.govdata import GovDataFeature
+    from mloda_plugin_govdata.feature_groups.destatis import DestatisReader
+    from mloda_plugin_govdata.feature_groups.govdata import BundeswahlleiterinReader
 
     (link,) = recipe.links
-    assert link.left_feature_group is GovDataFeature and link.right_feature_group is GovDataFeature, link
+    assert link.left_feature_group is DestatisReader and link.right_feature_group is BundeswahlleiterinReader, link
     assert link.left_index.index == ("1_variable_attribute_code",) and link.right_index.index == ("Nr",), link
-    # The discriminators must equal the features' option values exactly, or mloda never matches the node.
-    options = [feature.options.group for feature in recipe.features if isinstance(feature, Feature)]
-    assert link.left_discriminator in options and link.right_discriminator in options, (link, options)
+    # Each side's reader must be one the features point at, or mloda never matches the node.
+    pointed = {key for feature in recipe.features if isinstance(feature, Feature) for key in feature.options.group}
+    assert {DestatisReader.__name__, BundeswahlleiterinReader.__name__} <= pointed, pointed
     print("OK")
     """
 )
