@@ -42,8 +42,8 @@ def test_the_recipe_pins_both_payloads_and_carries_the_link(recipes_dir: Path) -
     assert election.credential_env == []
     (link,) = recipe.links
     assert (link.left_index.index, link.right_index.index) == ((KEY,), ("Nr",))
-    options = [feature.options.group for feature in recipe.features if isinstance(feature, Feature)]
-    assert link.left_discriminator in options and link.right_discriminator in options
+    pointed = {key for feature in recipe.features if isinstance(feature, Feature) for key in feature.options.group}
+    assert {link.left_feature_group.__name__, link.right_feature_group.__name__} <= pointed
 
 
 @respx.mock

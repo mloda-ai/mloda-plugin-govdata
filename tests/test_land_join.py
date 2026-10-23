@@ -13,7 +13,7 @@ from mloda.user import Feature, PluginCollector, mloda
 
 from mloda_plugin_govdata.feature_groups.destatis import DestatisReader, parse_ffcsv_zip
 from mloda_plugin_govdata.feature_groups.destatis.core.hosts import GENESIS_ONLINE
-from mloda_plugin_govdata.feature_groups.govdata import BundeswahlleiterinReader, GovDataFeature, GovDataLocator
+from mloda_plugin_govdata.feature_groups.govdata import BundeswahlleiterinReader, GovDataLocator
 from mloda_plugin_govdata.feature_groups.harmonization.core.land_codes import check_land_names
 from mloda_plugin_govdata.feature_groups.land_population_per_voter import (
     KERG_URL,
@@ -82,8 +82,10 @@ def test_land_join_through_mloda(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     result = mloda.run_all(
         [Feature(LandPopulationPerVoter.NAME)],
         compute_frameworks=["PyArrowTable"],
-        # Only the two groups the join needs resolve features, so no other registered group can claim a column.
-        plugin_collector=PluginCollector.enabled_feature_groups({GovDataFeature, LandPopulationPerVoter}),
+        # Only the groups the join needs resolve features, so no other registered group can claim a column.
+        plugin_collector=PluginCollector.enabled_feature_groups(
+            {DestatisReader, BundeswahlleiterinReader, LandPopulationPerVoter}
+        ),
     )
 
     table = result[0]
@@ -124,7 +126,9 @@ def test_each_source_keeps_its_own_name_for_extenders(tmp_path: Path, monkeypatc
     mloda.run_all(
         [Feature(LandPopulationPerVoter.NAME)],
         compute_frameworks=["PyArrowTable"],
-        plugin_collector=PluginCollector.enabled_feature_groups({GovDataFeature, LandPopulationPerVoter}),
+        plugin_collector=PluginCollector.enabled_feature_groups(
+            {DestatisReader, BundeswahlleiterinReader, LandPopulationPerVoter}
+        ),
         function_extender={recorder},
     )
 

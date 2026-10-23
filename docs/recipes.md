@@ -24,10 +24,8 @@ recipe.compliance.sources[0].attribution  # what to print next to the result
   "links": [
     {
       "join": "inner",
-      "left": {"feature_group": "GovDataFeature", "index": ["1_variable_attribute_code"],
-               "discriminator": {"DestatisReader": {"name": "12411-0010", "startyear": 2024, "endyear": 2024}}},
-      "right": {"feature_group": "GovDataFeature", "index": ["Nr"],
-                "discriminator": {"BundeswahlleiterinReader": "https://www.bundeswahlleiterin.de/.../kerg.csv"}}
+      "left": {"feature_group": "DestatisReader", "index": ["1_variable_attribute_code"]},
+      "right": {"feature_group": "BundeswahlleiterinReader", "index": ["Nr"]}
     }
   ],
   "compliance": {
@@ -94,9 +92,10 @@ policy as the reference tables in the harmonization package. The shipped files a
 
 ## Plan locks
 
-`recipes/locks/` holds one mloda plan lock per shipped recipe: the feature group, compute framework, reader
-and inputs of each step that the documented call (`compute_frameworks=["PyArrowTable"]`) resolves to. The offline
-tests fail with a diff when a plan changes, a mloda upgrade included. Regenerate the recipes and locks with
+`recipes/locks/` holds one mloda plan lock per shipped recipe: the feature group, compute framework and inputs
+of each step that the documented call (`compute_frameworks=["PyArrowTable"]`) resolves to, plus a hash of the
+code each reader can reach. The offline tests fail with a diff when a plan changes, a mloda upgrade or an edit
+to reader code included. Regenerate the recipes and locks with
 `uv run python scripts/write_recipes.py` and review the lock diff before committing.
 
 ## Shipped recipes

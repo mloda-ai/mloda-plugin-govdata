@@ -12,7 +12,7 @@ from mloda.user import Options
 
 from .core.locator import GovDataLocator
 from .core.parse import ColumnType, parse_multi_header_csv
-from .reader import BaseGovDataReader
+from .reader import BaseGovDataReader, is_scalar
 
 # Feature-option keys steering the multi-header election parse; defaults are the btw25 kerg.csv
 # geometry, so a new election file is a per-feature configuration change, not a code change.
@@ -58,33 +58,37 @@ class BundeswahlleiterinReader(BaseGovDataReader[GovDataLocator]):
     configuration step instead of a code change.
     """
 
-    READER_OPTIONS: ClassVar[dict[str, PropertySpec]] = {
+    PROPERTY_MAPPING: ClassVar[dict[str, PropertySpec] | None] = {
         OPTION_WAHL_SKIPROWS: PropertySpec(
             "Preamble lines to skip before the header block.",
             default=5,
             strict_validation=True,
-            scalar_only=True,
+            match_guard=is_scalar,
+            expected="a single value",
             element_validator=_is_non_negative_int,
         ),
         OPTION_WAHL_HEADER_ROWS: PropertySpec(
             "Merged header rows flattened into column names.",
             default=3,
             strict_validation=True,
-            scalar_only=True,
+            match_guard=is_scalar,
+            expected="a single value",
             element_validator=is_positive_int,
         ),
         OPTION_WAHL_LABEL_COLUMNS: PropertySpec(
             "Leading columns typed as strings, not value_type.",
             default=4,
             strict_validation=True,
-            scalar_only=True,
+            match_guard=is_scalar,
+            expected="a single value",
             element_validator=_is_non_negative_int,
         ),
         OPTION_WAHL_VALUE_TYPE: PropertySpec(
             "ColumnType of the non-label columns.",
             default=ColumnType.INTEGER,
             strict_validation=True,
-            scalar_only=True,
+            match_guard=is_scalar,
+            expected="a single value",
             allowed_values=tuple(ColumnType),
         ),
         OPTION_WAHL_TEXT_COLUMNS: PropertySpec(
@@ -99,9 +103,9 @@ class BundeswahlleiterinReader(BaseGovDataReader[GovDataLocator]):
     def _parse(cls, path: Path, locator: GovDataLocator, *, options: Options | None = None) -> pa.Table:
         return parse_multi_header_csv(
             path,
-            skiprows=int(cls.reader_option(OPTION_WAHL_SKIPROWS, options)),  # non-numeric values raise loudly
-            header_rows=int(cls.reader_option(OPTION_WAHL_HEADER_ROWS, options)),
-            label_columns=int(cls.reader_option(OPTION_WAHL_LABEL_COLUMNS, options)),
-            value_type=ColumnType(cls.reader_option(OPTION_WAHL_VALUE_TYPE, options)),
-            text_columns=_as_names(cls.reader_option(OPTION_WAHL_TEXT_COLUMNS, options)),
+            skiprows=int(cls._option(OPTION_WAHL_SKIPROWS, options)),  # non-numeric values raise loudly
+            header_rows=int(cls._option(OPTION_WAHL_HEADER_ROWS, options)),
+            label_columns=int(cls._option(OPTION_WAHL_LABEL_COLUMNS, options)),
+            value_type=ColumnType(cls._option(OPTION_WAHL_VALUE_TYPE, options)),
+            text_columns=_as_names(cls._option(OPTION_WAHL_TEXT_COLUMNS, options)),
         )

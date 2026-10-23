@@ -2,6 +2,7 @@
 
 import inspect
 import json
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
@@ -111,22 +112,48 @@ def test_writing_a_loaded_recipe_again_gives_the_same_text() -> None:
     assert first == second
 
 
-def test_links_block_builds_the_link_with_discriminators() -> None:
+def _kerg_self_link(right_url: str) -> Link:
+    """A same-class link, told apart from its twins by the right discriminator."""
+    return Link.inner(
+        JoinSpec(BundeswahlleiterinReader, "Nr"),
+        JoinSpec(BundeswahlleiterinReader, "Nr"),
+        left_discriminator={BundeswahlleiterinReader.__name__: KERG_URL},
+        right_discriminator={BundeswahlleiterinReader.__name__: right_url},
+    )
+
+
+def test_links_block_builds_the_link() -> None:
     loaded = parse_recipe(recipe_to_json(build_recipe(["value", "Nr"], COMPLIANCE, [LAND_LINK])))
 
     (link,) = loaded.links
     assert link.jointype is JoinType.INNER
-    assert link.left_feature_group is GovDataFeature and link.right_feature_group is GovDataFeature
+    assert link.left_feature_group is DestatisReader and link.right_feature_group is BundeswahlleiterinReader
     assert link.left_index == Index(("1_variable_attribute_code",)) and link.right_index == Index(("Nr",))
-    assert link.left_discriminator == {DestatisReader.__name__: LAND_LOCATOR}
-    assert link.right_discriminator == {BundeswahlleiterinReader.__name__: KERG_URL}
     assert link == LAND_LINK
+
+
+def test_links_block_builds_discriminators() -> None:
+    # A dict locator (the DestatisLocator form) as well as a string one.
+    destatis_self = Link.inner(
+        JoinSpec(DestatisReader, "time"),
+        JoinSpec(DestatisReader, "time"),
+        left_discriminator={DestatisReader.__name__: LAND_LOCATOR},
+        right_discriminator={DestatisReader.__name__: "12411-0015"},
+    )
+    links = [_kerg_self_link(BERLIN_URL), destatis_self]
+    loaded = parse_recipe(recipe_to_json(build_recipe(["Nr"], COMPLIANCE, links)))
+
+    kerg, destatis = loaded.links
+    assert kerg.left_discriminator == {BundeswahlleiterinReader.__name__: KERG_URL}
+    assert kerg.right_discriminator == {BundeswahlleiterinReader.__name__: BERLIN_URL}
+    assert destatis.left_discriminator == {DestatisReader.__name__: LAND_LOCATOR}
+    assert loaded.links == links
 
 
 def test_a_same_name_key_link_and_a_multi_column_index_round_trip() -> None:
     same_key = Link.left(
-        JoinSpec(GovDataFeature, ("Nr", "Gebiet")),
-        JoinSpec(GovDataFeature, ("Nr", "Gebiet")),
+        JoinSpec(BundeswahlleiterinReader, ("Nr", "Gebiet")),
+        JoinSpec(BundeswahlleiterinReader, ("Nr", "Gebiet")),
         left_discriminator={BundeswahlleiterinReader.__name__: KERG_URL},
         right_discriminator={BundeswahlleiterinReader.__name__: BERLIN_URL},
     )
@@ -150,41 +177,34 @@ def test_a_feature_level_link_is_hoisted_once() -> None:
 
 def test_links_that_differ_only_by_discriminator_stay_distinct() -> None:
     # mloda's Link equality includes discriminators, so both survive a recipe's links block and run_all(links=...).
-    other = Link.inner(
-        JoinSpec(GovDataFeature, "1_variable_attribute_code"),
-        JoinSpec(GovDataFeature, "Nr"),
-        left_discriminator={DestatisReader.__name__: LAND_LOCATOR},
-        right_discriminator={BundeswahlleiterinReader.__name__: BERLIN_URL},
-    )
-    assert len({LAND_LINK, other}) == 2
-    recipe = build_recipe(["value", "Nr"], COMPLIANCE, [LAND_LINK, other])
+    first, other = _kerg_self_link(BERLIN_URL), _kerg_self_link(KERG_URL)
+    assert len({first, other}) == 2
+    recipe = build_recipe(["Nr"], COMPLIANCE, [first, other])
     loaded = parse_recipe(recipe_to_json(recipe))
-    assert set(loaded.links) == {LAND_LINK, other}
+    assert set(loaded.links) == {first, other}
 
 
 def test_two_feature_level_links_differing_only_by_discriminator_both_hoist() -> None:
-    other = Link.inner(
-        JoinSpec(GovDataFeature, "1_variable_attribute_code"),
-        JoinSpec(GovDataFeature, "Nr"),
-        left_discriminator={DestatisReader.__name__: LAND_LOCATOR},
-        right_discriminator={BundeswahlleiterinReader.__name__: BERLIN_URL},
-    )
-    features: list[Feature | str] = [Feature("value", link=LAND_LINK), Feature("Nr", link=other)]
+    first, other = _kerg_self_link(BERLIN_URL), _kerg_self_link(KERG_URL)
+    features: list[Feature | str] = [Feature("Gebiet", link=first), Feature("Nr", link=other)]
     recipe = build_recipe(features, COMPLIANCE)
     assert len(recipe.links) == 2
     loaded = parse_recipe(recipe_to_json(recipe))
-    assert set(loaded.links) == {LAND_LINK, other}
+    assert set(loaded.links) == {first, other}
 
 
 def test_an_unknown_feature_group_in_the_links_block_is_named() -> None:
-    text = recipe_to_json(build_recipe(["Nr"], COMPLIANCE, [LAND_LINK])).replace("GovDataFeature", "NoSuchFeature", 1)
+    text = recipe_to_json(build_recipe(["Nr"], COMPLIANCE, [LAND_LINK])).replace("DestatisReader", "NoSuchFeature", 1)
     with pytest.raises(RecipeError, match=r"links\[0\].left: no FeatureGroup named 'NoSuchFeature' is loaded"):
         parse_recipe(text)
 
 
 def test_an_asof_link_has_no_recipe_form() -> None:
     asof = Link.asof(
-        JoinSpec(GovDataFeature, "Nr"), JoinSpec(GovDataFeature, "Nr"), left_time_column="t", right_time_column="t"
+        JoinSpec(BundeswahlleiterinReader, "Nr"),
+        JoinSpec(BundeswahlleiterinReader, "Nr"),
+        left_time_column="t",
+        right_time_column="t",
     )
     with pytest.raises(RecipeError, match=r"links\[0\]: asof joins have no recipe form"):
         build_recipe(["Nr"], COMPLIANCE, [asof])
@@ -192,9 +212,10 @@ def test_an_asof_link_has_no_recipe_form() -> None:
 
 def test_every_feature_constructor_parameter_is_either_carried_or_refused() -> None:
     parameters = set(inspect.signature(Feature.__init__).parameters) - {"self"}
-    refused = {attribute for attribute, _, _ in _UNSUPPORTED}
-    # compute_framework is the constructor name; the attribute is compute_frameworks.
-    assert parameters == SUPPORTED_FEATURE_PARAMETERS | (refused - {"compute_frameworks"}) | {"compute_framework"}
+    # Constructor name where the attribute differs.
+    renamed = {"compute_frameworks": "compute_framework", "_connection_holder": "connection"}
+    refused = {renamed.get(attribute, attribute) for attribute, _, _ in _UNSUPPORTED}
+    assert parameters == SUPPORTED_FEATURE_PARAMETERS | refused
     # The writer carries every Options field; a new one must be written or refused, never dropped.
     assert set(inspect.signature(Options.__init__).parameters) - {"self"} == {
         "group",
@@ -216,12 +237,14 @@ def test_every_feature_constructor_parameter_is_either_carried_or_refused() -> N
         (Feature("x", forward_group_exclude=["k"]), "forward_group_exclude"),
         (Feature("x", inherit_context_keys=["k"]), "inherit_context_keys"),
         (Feature("x", required_declarations={"k": "v"}), "required_declarations"),
+        (Feature("x", keep_index=True), "keep_index"),
+        (Feature("x", connection=sqlite3.connect(":memory:")), "_connection_holder"),
     ],
 )
 def test_feature_attributes_without_a_config_field_raise_instead_of_being_dropped(
     feature: Feature, attribute: str
 ) -> None:
-    with pytest.raises(RecipeError, match=rf"features\[0\]: Feature.{attribute} has no field"):
+    with pytest.raises(RecipeError, match=rf"features\[0\]: Feature.{attribute} has no recipe form"):
         build_recipe([feature], COMPLIANCE)
 
 
@@ -242,6 +265,16 @@ def test_domain_and_compute_framework_given_as_options_round_trip() -> None:
     (loaded,) = _features(parse_recipe(recipe_to_json(build_recipe([feature], COMPLIANCE))).features)
     assert loaded.options.group.get("compute_framework") == "PyArrowTable"
     assert loaded.domain == feature.domain and loaded.compute_frameworks == feature.compute_frameworks
+
+
+@pytest.mark.parametrize("pin", ["PandasAggregation", ["PandasAggregation", "PyArrowAggregation"]])
+def test_an_implementation_pin_round_trips(pin: str | list[str]) -> None:
+    recipe = build_recipe([Feature("x", implementation=pin)], COMPLIANCE)
+    assert recipe.features[0] == {"name": "x", "implementation": pin}
+    (loaded,) = parse_recipe(recipe_to_json(recipe)).features
+    assert (
+        isinstance(loaded, Feature) and loaded.implementation_pin == Feature("x", implementation=pin).implementation_pin
+    )
 
 
 def test_a_constructor_domain_is_written_to_the_domain_option() -> None:
@@ -336,7 +369,7 @@ def test_the_writer_refuses_what_its_own_loader_would_refuse() -> None:
     # Passes the item model, fails inside mloda's config loader; build_recipe runs the loader so no file is written.
     feature = Feature("x", options={"feature_group": "GovDataFeature", "k": 1})
     with pytest.raises(
-        RecipeError, match="mloda rejected the feature array: 'feature_group' must not be a top-level key"
+        RecipeError, match="mloda rejected the feature array: .*'feature_group' must not be a top-level key"
     ):
         build_recipe([feature], COMPLIANCE)
 

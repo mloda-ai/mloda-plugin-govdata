@@ -19,12 +19,12 @@ from typing import Any, ClassVar
 from urllib.parse import urlencode
 
 import pyarrow as pa
-from mloda.provider import PropertySpec, is_positive_int
+from mloda.provider import PropertySpec, PropertyValidationError, is_positive_int, validate_property_values
 from mloda.user import Options
 
 from .core.locator import GovDataLocator
 from .core.parse import ColumnType
-from .reader import BaseGovDataReader
+from .reader import BaseGovDataReader, is_scalar
 
 UBA_AIR_BASE = "https://luftdaten.umweltbundesamt.de/api/air-data/v4"
 # UBA data terms (no SPDX id, hence LicenseRef-): use permitted under section 12a EGovG, name the UBA as source,
@@ -247,76 +247,98 @@ class UbaAirReader(BaseGovDataReader[GovDataLocator]):
     """
 
     LICENSE: ClassVar[str | None] = UBA_LICENSE
-    READER_OPTIONS: ClassVar[dict[str, PropertySpec]] = {
+    PROPERTY_MAPPING: ClassVar[dict[str, PropertySpec] | None] = {
         OPTION_UBA_STATION: PropertySpec(
-            "UBA station id.", strict_validation=True, element_validator=is_positive_int, scalar_only=True
+            "UBA station id.",
+            strict_validation=True,
+            element_validator=is_positive_int,
+            match_guard=is_scalar,
+            expected="a single value",
         ),
         OPTION_UBA_COMPONENT: PropertySpec(
             "UBA component id (see the UBA components endpoint).",
             strict_validation=True,
             element_validator=is_positive_int,
-            scalar_only=True,
+            match_guard=is_scalar,
+            expected="a single value",
         ),
         OPTION_UBA_SCOPE: PropertySpec(
             "UBA scope id (see the UBA scopes endpoint).",
             strict_validation=True,
             element_validator=is_positive_int,
-            scalar_only=True,
+            match_guard=is_scalar,
+            expected="a single value",
         ),
         OPTION_UBA_DATE_FROM: PropertySpec(
-            "Query window start, YYYY-MM-DD.", strict_validation=True, element_validator=_is_iso_date, scalar_only=True
+            "Query window start, YYYY-MM-DD.",
+            strict_validation=True,
+            element_validator=_is_iso_date,
+            match_guard=is_scalar,
+            expected="a single value",
         ),
         OPTION_UBA_DATE_TO: PropertySpec(
-            "Query window end, YYYY-MM-DD.", strict_validation=True, element_validator=_is_iso_date, scalar_only=True
+            "Query window end, YYYY-MM-DD.",
+            strict_validation=True,
+            element_validator=_is_iso_date,
+            match_guard=is_scalar,
+            expected="a single value",
         ),
         OPTION_UBA_TIME_FROM: PropertySpec(
             "Start hour slot (1-24).",
             default=1,
             strict_validation=True,
             element_validator=_is_hour_slot,
-            scalar_only=True,
+            match_guard=is_scalar,
+            expected="a single value",
         ),
         OPTION_UBA_TIME_TO: PropertySpec(
             "End hour slot (1-24).",
             default=24,
             strict_validation=True,
             element_validator=_is_hour_slot,
-            scalar_only=True,
+            match_guard=is_scalar,
+            expected="a single value",
         ),
         OPTION_UBA_LANG: PropertySpec(
             "UBA API response language.",
             default="en",
             strict_validation=True,
             element_validator=_is_non_empty_str,
-            scalar_only=True,
+            match_guard=is_scalar,
+            expected="a single value",
         ),
     }
 
     @classmethod
-    def suffix(cls) -> tuple[str, ...]:
-        return (".json",)
-
-    @classmethod
-    def match_subclass_data_access(cls, data_access: Any, feature_names: list[str], options: Any) -> Any:
-        if data_access is not True:
+    def _source_locator(cls, value: Any, feature_name: str, options: Options) -> GovDataLocator | None:
+        if value is not True:
             return None
-        date_from = cls.reader_option(OPTION_UBA_DATE_FROM, options)
-        date_to = cls.reader_option(OPTION_UBA_DATE_TO, options)
+        values = {key: cls._option(key, options) for key in cls.PROPERTY_MAPPING or {}}
+        try:
+            validate_property_values(values, cls.PROPERTY_MAPPING or {}, closed_world=False)
+            valid = all(is_scalar(option) for option in values.values())
+        except PropertyValidationError:
+            valid = False
+        if not valid:
+            # mloda checks the options only after a source matched; this placeholder lets it name the bad option.
+            return GovDataLocator(distribution_url=f"{UBA_AIR_BASE}/measures/json")
+        date_from = cls._option(OPTION_UBA_DATE_FROM, options)
+        date_to = cls._option(OPTION_UBA_DATE_TO, options)
         if date_from > date_to:
             raise ValueError(f"{cls.__name__}: date_from {date_from!r} is after date_to {date_to!r}.")
-        time_from = cls.reader_option(OPTION_UBA_TIME_FROM, options)
-        time_to = cls.reader_option(OPTION_UBA_TIME_TO, options)
+        time_from = cls._option(OPTION_UBA_TIME_FROM, options)
+        time_to = cls._option(OPTION_UBA_TIME_TO, options)
         if int(time_from) > int(time_to):
             raise ValueError(f"{cls.__name__}: time_from {time_from!r} is after time_to {time_to!r}.")
         url = uba_measures_url(
-            station=cls.reader_option(OPTION_UBA_STATION, options),
-            component=cls.reader_option(OPTION_UBA_COMPONENT, options),
-            scope=cls.reader_option(OPTION_UBA_SCOPE, options),
+            station=cls._option(OPTION_UBA_STATION, options),
+            component=cls._option(OPTION_UBA_COMPONENT, options),
+            scope=cls._option(OPTION_UBA_SCOPE, options),
             date_from=date_from,
             date_to=date_to,
             time_from=time_from,
             time_to=time_to,
-            lang=cls.reader_option(OPTION_UBA_LANG, options),
+            lang=cls._option(OPTION_UBA_LANG, options),
         )
         return GovDataLocator(distribution_url=url)
 

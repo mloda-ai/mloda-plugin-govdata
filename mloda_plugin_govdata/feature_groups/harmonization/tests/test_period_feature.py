@@ -1,4 +1,4 @@
-"""AnnualPeriodFeature: int years, GENESIS labels, and dates through mloda.run_all, plus the scoping path."""
+"""AnnualPeriodFeature: int years, GENESIS labels, and dates through mloda.run_all, over any reader."""
 
 import json
 from collections.abc import Callable
@@ -77,16 +77,19 @@ def _mock_csv(text: str) -> None:
 
 
 @respx.mock
-def test_genesis_labels_over_a_plain_csv_need_the_group_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    # GovDataReader claims any name whose options carry its key, so a chained name over it is scoped explicitly.
+def test_genesis_labels_over_a_plain_csv_resolve_without_a_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The pointed reader steps aside for a name another group computes, so no feature_group scope is needed.
     monkeypatch.setattr(GovDataReader, "cache_dir", str(tmp_path))
     _mock_csv("Jahr;Stichtag\n2015;31.12.2015\n2016;2016-12-31\n")
     options = {GovDataReader.__name__: CSV_URL}
-    with pytest.raises(ValueError, match="Multiple feature groups found"):
-        _run([Feature("Jahr__year_period", options=options)])
+    # The pre-0.17 workaround, a scope naming another group than the pointer, is refused.
+    with pytest.raises(ValueError, match="name different groups"):
+        _run([Feature("Jahr__year_period", options=options, feature_group=AnnualPeriodFeature)])
     features: list[Feature | str] = [
-        Feature("Jahr__year_period", options=options, feature_group=AnnualPeriodFeature),
-        Feature("Stichtag__year_period", options=options, feature_group=AnnualPeriodFeature),
+        Feature("Jahr__year_period", options=options),
+        Feature("Stichtag__year_period", options=options),
     ]
     table = _run(features)[0]
     assert table.column("Jahr__year_period").to_pylist() == [date(2015, 1, 1), date(2016, 1, 1)]
@@ -107,9 +110,7 @@ def test_a_date_inside_the_year_is_refused(
             200, content=(govdata_fixtures_dir / "population_sample.csv").read_bytes(), headers={"ETag": '"v1"'}
         )
     )
-    feature = Feature(
-        "Stichtag__year_period", options={StuttgartPopulationReader.__name__: SLUG}, feature_group=AnnualPeriodFeature
-    )
+    feature = Feature("Stichtag__year_period", options={StuttgartPopulationReader.__name__: SLUG})
     with pytest.raises(ValueError, match="Stichtag, row 0: '1986-06-30' is a STAG date but not the annual 31 Dec"):
         _run([feature])
 
@@ -118,7 +119,7 @@ def test_a_date_inside_the_year_is_refused(
 def test_a_missing_time_value_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(GovDataReader, "cache_dir", str(tmp_path))
     _mock_csv("Jahr;x\n2015;a\n;b\n")
-    feature = Feature("Jahr__year_period", options={GovDataReader.__name__: CSV_URL}, feature_group=AnnualPeriodFeature)
+    feature = Feature("Jahr__year_period", options={GovDataReader.__name__: CSV_URL})
     with pytest.raises(ValueError, match="Jahr, row 1: no time value"):
         _run([feature])
 

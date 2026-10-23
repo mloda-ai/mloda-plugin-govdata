@@ -3,22 +3,24 @@
     {
       "compute_framework": "mloda_plugins.compute_framework.base_implementations.pyarrow.table:PyArrowTable",
       "compute_framework_reason": "only allowed framework",
-      "feature_group": "mloda_plugin_govdata.feature_groups.govdata.feature:GovDataFeature",
+      "feature_group": "mloda_plugin_govdata.feature_groups.govdata.population:StuttgartPopulationReader",
+      "feature_group_hash": "25d21180557e6d28c1ebb6e77b255d2dc7c5a58ee5ff706054a87e2e5ca286d5",
       "feature_names": [
         "Alter in 10 Gruppen",
         "Einwohner",
         "Stadtbezirk",
         "Stichtag"
       ],
+      "implementation": "neutral",
+      "implementation_hash": null,
+      "implementation_specialized_from": [],
       "input_feature_edges": {},
-      "reader": "mloda_plugin_govdata.feature_groups.govdata.population:StuttgartPopulationReader",
+      "leaves_connection": null,
       "result_framework": "mloda_plugins.compute_framework.base_implementations.pyarrow.table:PyArrowTable",
-      "specialized_from": [
-        "mloda_plugins.feature_group.input_data.read_file_feature:ReadFileFeature"
-      ]
+      "specialized_from": []
     }
   ],
-  "format": 5,
+  "format": 8,
   "joins": [],
   "requested_features": [
     "Alter in 10 Gruppen",

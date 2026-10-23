@@ -62,9 +62,8 @@ def test_options_group_is_refused() -> None:
 
 
 def test_options_context_refuses_anything_but_the_redacting_instance() -> None:
-    # A plain mapping would sit unredacted in the context, which str(options) prints verbatim.
+    # Only the redacting instance: a plain mapping's masking would depend on mloda's key-name heuristics.
     options = Options(context={OPTION_GENESIS_CREDENTIALS: {"token": TOKEN}})
-    assert TOKEN in str(options)  # the very reason the form is refused
     with pytest.raises(TypeError, match="DestatisCredentials instance"):
         explicit_credentials_from_options(options)
     with pytest.raises(TypeError):

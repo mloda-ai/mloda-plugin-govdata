@@ -58,7 +58,7 @@ _SCRIPT = textwrap.dedent(
     provenance = json.loads(table.column("destatis__bevoelkerung__kreise~provenance").to_pylist()[0])
     assert provenance["sheet"] == "2015-2016", provenance
     steps = [step.feature_group_name for step in result.plan if step.step_kind == "compute"]
-    assert steps == ["GovDataFeature", "KreisRebaseFeature"], steps
+    assert steps == ["DestatisReader", "KreisRebaseFeature"], steps
     print("OK")
     """
 )

@@ -3,7 +3,8 @@
     {
       "compute_framework": "mloda_plugins.compute_framework.base_implementations.pyarrow.table:PyArrowTable",
       "compute_framework_reason": "only allowed framework",
-      "feature_group": "mloda_plugin_govdata.feature_groups.govdata.feature:GovDataFeature",
+      "feature_group": "mloda_plugin_govdata.feature_groups.govdata.bundeswahlleiterin:BundeswahlleiterinReader",
+      "feature_group_hash": "af7765a1fac57e923cb9a1fc50e2b315c32b67383d8fd0dd7fe3ccde34efa32c",
       "feature_names": [
         "Christlich-Soziale Union in Bayern e.V. Zweitstimmen Endg\u00fcltig",
         "Gebiet",
@@ -14,15 +15,16 @@
         "geh\u00f6rt zu",
         "\u00dcbrige Erststimmen Vorperiode"
       ],
+      "implementation": "neutral",
+      "implementation_hash": null,
+      "implementation_specialized_from": [],
       "input_feature_edges": {},
-      "reader": "mloda_plugin_govdata.feature_groups.govdata.bundeswahlleiterin:BundeswahlleiterinReader",
+      "leaves_connection": null,
       "result_framework": "mloda_plugins.compute_framework.base_implementations.pyarrow.table:PyArrowTable",
-      "specialized_from": [
-        "mloda_plugins.feature_group.input_data.read_file_feature:ReadFileFeature"
-      ]
+      "specialized_from": []
     }
   ],
-  "format": 5,
+  "format": 8,
   "joins": [],
   "requested_features": [
     "Christlich-Soziale Union in Bayern e.V. Zweitstimmen Endg\u00fcltig",

@@ -16,13 +16,6 @@ def test_mloda_core_imports() -> None:
     assert Extender is not None
 
 
-def test_mloda_testing_imports() -> None:
-    """Verify mloda.testing module imports work."""
-    from mloda.testing.base import FeatureGroupTestBase
-
-    assert FeatureGroupTestBase is not None
-
-
 def test_mloda_user_imports() -> None:
     """Verify mloda.user and its pyarrow backend module import work."""
     from mloda.user import Feature, Options, mloda
