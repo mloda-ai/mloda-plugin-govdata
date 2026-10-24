@@ -1,4 +1,4 @@
-"""Host-scoped GENESIS credentials: explicit option first, then env; redacted in every text form."""
+"""Host-scoped GENESIS credentials: explicit option, then the run's DataAccessCollection, then env; redacted."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from mloda.user import Options
+from mloda.user import DataAccessCollection, Options
 
 from .errors import MissingCredentialsError, WrongHostCredentialsError
 from .hosts import GenesisHost
@@ -105,7 +105,7 @@ def missing_credentials_message(host: GenesisHost) -> str:
     token_var, user_var, password_var = (host.env_var(suffix) for suffix in ENV_SUFFIXES)
     return (
         f"No credentials for {host.label}. Set {token_var} (personal API token), or {user_var} and "
-        f"{password_var}, or pass DestatisCredentials in Options(context={{{OPTION_GENESIS_CREDENTIALS!r}: ...}}). "
+        f"{password_var}, or pass the token in the run's DataAccessCollection under the handle {host.name!r}. "
         f"Registration is free and same-day: {host.registration_url}. Registrations are per host, so a token "
         "from another GENESIS installation is not valid here."
     )
@@ -128,6 +128,41 @@ def resolve_credentials(
     if from_env is None:
         raise MissingCredentialsError(missing_credentials_message(host))
     return from_env
+
+
+_CREDENTIAL_KEYS = frozenset({"host", "token", "user", "password"})
+
+
+def credentials_from_collection(
+    collection: DataAccessCollection | None, host: GenesisHost
+) -> DestatisCredentials | None:
+    """The collection's GENESIS credentials for ``host``, or ``None``; errors name handles and keys, never values.
+
+    An entry counts only when tagged for GENESIS: its handle is a host name (``genesis``, ``regionalstatistik``)
+    or it carries a known ``host`` key, so another plugin's token is never sent here.
+    """
+    entries = {} if collection is None else collection.credentials
+    matching = sorted(name for name, entry in entries.items() if _tag(entry.get("host", name)) == host.name)
+    if len(matching) > 1:
+        raise ValueError(f"Several credentials for host {host.name!r}: {', '.join(matching)}; keep one.")
+    return _destatis_credentials(matching[0], entries[matching[0]], host.name) if matching else None
+
+
+def _tag(value: object) -> str | None:
+    return value.strip().lower() if isinstance(value, str) else None
+
+
+def _destatis_credentials(handle: str, entry: Mapping[str, object], host: str) -> DestatisCredentials:
+    unknown = sorted(set(entry) - _CREDENTIAL_KEYS)
+    if unknown:
+        raise ValueError(
+            f"Credentials {handle!r} have unknown key(s) {unknown}; GENESIS takes {sorted(_CREDENTIAL_KEYS)}."
+        )
+    fields = {key: value for key, value in entry.items() if key != "host"}
+    try:
+        return DestatisCredentials(host=host, **fields)  # type: ignore[arg-type]
+    except ValueError as exc:  # __post_init__ names fields only, never values
+        raise ValueError(f"Credentials {handle!r}: {exc}") from None
 
 
 def explicit_credentials_from_options(options: Options | None) -> DestatisCredentials | None:

@@ -17,6 +17,14 @@ def _hosts_with_credentials() -> list[str]:
     return hosts
 
 
+@pytest.fixture
+def no_genesis_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No GENESIS credentials in the environment, for any known host."""
+    for host in KNOWN_HOSTS.values():
+        for suffix in ENV_SUFFIXES:
+            monkeypatch.delenv(host.env_var(suffix), raising=False)
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     if _hosts_with_credentials():
         return

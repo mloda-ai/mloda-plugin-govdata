@@ -82,8 +82,8 @@ GENESIS token is one such run; only the compliance `sha256` field is exempt), a 
 in front of the host, an entry in `credential_env` that is not an env-var name, and any value of the
 process's own `GENESIS_*` or `REGIONALSTATISTIK_*` token and password variables found in the file (a user
 name too, when it carries a digit or `@`). Errors raised by `load_recipe`, `parse_recipe`, and
-`build_recipe` name the location, never the value. Credentials resolve from the environment at run time;
-see [credentials.md](credentials.md).
+`build_recipe` name the location, never the value. Credentials resolve at run time, from the run's
+`DataAccessCollection` or the environment; see [credentials.md](credentials.md).
 
 ## Where recipe files live
 
