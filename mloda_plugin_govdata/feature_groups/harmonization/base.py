@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, ClassVar, TypeVar
@@ -22,11 +21,6 @@ from mloda.user.pyarrow import PyArrowTable
 from ..destatis.core.auth import OPTION_GENESIS_CREDENTIALS
 from ..govdata.core.cache import DEFAULT_CACHE_DIR, CacheMissError, DownloadCache
 
-# A part selector is lowercase letters and digits only, so ``~key__nuts2024`` never reads as one part.
-PART_PATTERN = r"[a-z0-9]+"
-# The optional trailing ``~part`` of a PREFIX_PATTERN: request one output column of the group alone.
-OPTIONAL_PART = rf"(?:{re.escape(COLUMN_SEPARATOR)}{PART_PATTERN})?"
-_TRAILING_PART = re.compile(rf"{re.escape(COLUMN_SEPARATOR)}({PART_PATTERN})$")
 _T = TypeVar("_T")
 
 
@@ -51,8 +45,6 @@ class HarmonizationFeature(FeatureChainParserMixin, FeatureGroup):
     cache_dir: ClassVar[str] = str(DEFAULT_CACHE_DIR)  # reference tables are read offline from here
     # Context keys the children pull from the consumer; context never enters the feature hash.
     inherited_context_keys: ClassVar[frozenset[str]] = frozenset({OPTION_GENESIS_CREDENTIALS})
-    # The ``~part`` columns a multi-output group returns; empty for a one-column group, whose name is not checked.
-    PARTS: ClassVar[tuple[str, ...]] = ()
 
     @classmethod
     def fetch_reference(cls) -> None:
@@ -76,16 +68,21 @@ class HarmonizationFeature(FeatureChainParserMixin, FeatureGroup):
     def match_feature_group_criteria(
         cls, feature_name: str | FeatureName, options: Options, data_access_collection: Any = None
     ) -> bool:
-        """Refuses a trailing ``~part`` the group does not return, with the valid parts as mloda's reason."""
-        if not super().match_feature_group_criteria(feature_name, options, data_access_collection):
-            return False
-        trailing = _TRAILING_PART.search(str(feature_name))
-        if not cls.PARTS or trailing is None or trailing.group(1) in cls.PARTS:
-            return True
-        parts = ", ".join(f"~{part}" for part in cls.PARTS)
-        reason = f"unknown part ~{trailing.group(1)}; {cls.__name__} returns {parts}"
-        record_match_rejection(cls.__name__, reason, stage=NAME_STAGE)
+        """A ``~part`` name never matches whole, so mloda reads it against OUTPUT_PARTS (configuration names too)."""
+        split = FeatureGroup.split_output_part(str(feature_name))
+        if not cls.OUTPUT_PARTS or split is None:
+            return super().match_feature_group_criteria(feature_name, options, data_access_collection)
+        base, part = split
+        if COLUMN_SEPARATOR in part and super().match_feature_group_criteria(base, options, data_access_collection):
+            reason = f"'{part}' is a nested part; {cls.__name__} returns one column per part: {list(cls.OUTPUT_PARTS)}"
+            record_match_rejection(cls.__name__, reason, stage=NAME_STAGE)
         return False
+
+    @staticmethod
+    def split_output_part(name: str) -> tuple[str, str] | None:
+        """mloda's split without nested parts (``~flag~x``), which would otherwise only fail after the fetch."""
+        split = FeatureGroup.split_output_part(name)
+        return None if split is None or COLUMN_SEPARATOR in split[1] else split
 
     @classmethod
     def child(cls, name: str) -> Feature:
@@ -109,19 +106,10 @@ class HarmonizationFeature(FeatureChainParserMixin, FeatureGroup):
         """The one input column, from the chained name (``x__op``) or from ``in_features``."""
         return cls._extract_single_source_feature(feature)
 
-    @staticmethod
-    def base_name(feature_name: str) -> str:
-        """``x__op~part`` requested alone still computes the whole ``x__op`` output; an upstream part stays."""
-        return _TRAILING_PART.sub("", feature_name)
-
     @classmethod
-    def by_base(cls, features: FeatureSet) -> dict[str, Feature]:
-        """One feature per output base, computed once. Iterates in feature-name order (not base-name
-        order), so a base/part collision deterministically keeps the part (its full name, with the
-        trailing ``~part``, always sorts after the bare base name); the winner's Options are used,
-        the loser's are dropped.
-        """
-        return {cls.base_name(str(feature.name)): feature for feature in features.get_sorted_features()}
+    def by_name(cls, features: FeatureSet) -> dict[str, Feature]:
+        """One feature per output, in name order; mloda hands a ``~part`` request over as its base name."""
+        return {str(feature.name): feature for feature in features.get_sorted_features()}
 
     @classmethod
     def declared(cls, feature: Feature, key: str) -> str:

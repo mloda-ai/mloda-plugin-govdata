@@ -11,7 +11,7 @@ from mloda.provider import DefaultOptionKeys, FeatureSet, property_spec
 from mloda.user import Feature, FeatureName, Options
 
 from ..govdata.core.cache import CacheMissError, DownloadCache
-from .base import OPTIONAL_PART, HarmonizationFeature, offline_first
+from .base import HarmonizationFeature, offline_first
 from .core.crosswalk import NUTS_VERSION, NutsCrosswalk, load_nuts_crosswalk
 from .core.nuts import map_ags_to_nuts
 from .core.reference.gv_isys import load_gv_isys_changes
@@ -28,10 +28,10 @@ class AgsToNutsFeature(HarmonizationFeature):
     name (or ``nuts_version``) must be the cached crosswalk's, so a result names what it was mapped with.
     """
 
-    PREFIX_PATTERN = rf".*__nuts(?P<nuts_version>{NUTS_VERSION}){OPTIONAL_PART}$"
+    PREFIX_PATTERN = rf".*__nuts(?P<nuts_version>{NUTS_VERSION})$"
     MIN_IN_FEATURES = 1
     MAX_IN_FEATURES = 1
-    PARTS: ClassVar = ("key", "nuts1", "nuts2", "nuts3", "version", "unmatched")
+    OUTPUT_PARTS: ClassVar[tuple[str, ...]] = ("key", "nuts1", "nuts2", "nuts3", "version", "unmatched")
     PROPERTY_MAPPING: ClassVar = {
         "nuts_version": property_spec(
             "NUTS version the keys resolve against",
@@ -77,7 +77,7 @@ class AgsToNutsFeature(HarmonizationFeature):
     def calculate_feature(cls, data: Any, features: FeatureSet) -> Any:
         table: pa.Table = data
         crosswalk = cls.load_crosswalk()
-        for name, feature in cls.by_base(features).items():
+        for name, feature in cls.by_name(features).items():
             version = cls.declared(feature, "nuts_version")
             if version != crosswalk.nuts_version:
                 raise ValueError(
@@ -106,7 +106,7 @@ class AgsToNutsFeature(HarmonizationFeature):
                 "version": [crosswalk.nuts_version if k in matched else None for k in raw],
                 "unmatched": [NULL_KEY if k is None else reasons.get(k, "") for k in raw],
             }
-            for part in cls.PARTS:
+            for part in cls.OUTPUT_PARTS:
                 table = table.append_column(f"{name}~{part}", pa.array(parts[part], pa.string()))
         return table
 

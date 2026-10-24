@@ -1,12 +1,11 @@
 """Recipe model: file shape, unknown keys, compliance fields, and credential rejection."""
 
-import dataclasses
 import json
 from typing import Any
 
 import pytest
 
-from mloda_plugin_govdata.recipes import FeatureItem, Recipe, RecipeError, parse_recipe
+from mloda_plugin_govdata.recipes import Recipe, RecipeError, parse_recipe
 from mloda_plugin_govdata.recipes.credential_scan import TOKEN_RUN_LENGTH, environment_secrets
 
 LOCATOR = {"name": "12411-0010", "startyear": 2024, "endyear": 2024}
@@ -58,25 +57,17 @@ def _no_genesis_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
-def test_feature_item_fields_mirror_mloda_feature_config() -> None:
-    from mloda.core.api.feature_config.models import FeatureConfig
-
-    assert set(FeatureItem.model_fields) == {f.name for f in dataclasses.fields(FeatureConfig)}
+# mloda's config loader checks the feature items and names the failing one.
+ITEM_1 = r'mloda rejected the feature array: feature config item 1 \("x"\): '
 
 
-def test_feature_item_mirrors_mloda_cross_field_rules() -> None:
+def test_mloda_cross_field_rules_name_the_item() -> None:
     _rejects(
         _recipe(features=[{"name": "x", "options": {"a": 1}, "group_options": {"b": 2}}]),
-        r"features\[0\]: options cannot be combined with group_options or context_options",
+        ITEM_1 + "Cannot use both 'options' and 'group_options'",
     )
-    _rejects(
-        _recipe(features=[{"name": "x", "propagate_context_keys": ["c"]}]),
-        r"features\[0\]: propagate_context_keys needs context_options",
-    )
-    _rejects(
-        _recipe(features=[{"name": "x", "cascade_context_keys": ["c"]}]),
-        r"features\[0\]: cascade_context_keys needs context_options",
-    )
+    for keys in ("propagate_context_keys", "cascade_context_keys"):
+        _rejects(_recipe(features=[{"name": "x", keys: ["c"]}]), ITEM_1 + f"'{keys}' requires 'context_options'")
 
 
 def test_minimal_recipe_validates_and_links_default_to_empty() -> None:
@@ -94,21 +85,17 @@ def test_features_must_be_a_non_empty_array() -> None:
     _rejects(_recipe(features={"name": "value"}), "features")
 
 
-def test_an_unknown_key_inside_a_feature_item_names_it_and_the_allowed_keys() -> None:
-    error = _rejects(_recipe(features=[{"name": "value", "bogus": 1}]), r"features\[0\]: unknown key\(s\) \['bogus'\]")
-    assert (
-        "'column_index', 'context_options', 'feature_group', 'group_options', 'implementation', 'in_features', 'name'"
-        in str(error)
-    )
+def test_an_unknown_key_inside_a_feature_item_is_named() -> None:
+    _rejects(_recipe(features=[{"name": "x", "bogus": 1}]), ITEM_1 + ".*unexpected keyword argument 'bogus'")
 
 
 def test_feature_item_types_are_checked() -> None:
-    _rejects(_recipe(features=[{"name": "value", "in_features": "a"}]), r"features\[0\]: in_features: Input should be")
+    _rejects(_recipe(features=[{"name": "x", "in_features": "a"}]), ITEM_1 + "'in_features' must be an array")
 
 
 def test_empty_feature_names_are_rejected() -> None:
-    _rejects(_recipe(features=[""]), r"features\[0\]: a feature name must not be empty")
-    _rejects(_recipe(features=[{"name": ""}]), r"features\[0\]: name: String should have at least 1 character")
+    _rejects(_recipe(features=[""]), "feature config item 1: a feature name string must be non-empty")
+    _rejects(_recipe(features=[{"name": ""}]), "feature config item 1: 'name' must be a non-empty string")
 
 
 def test_compliance_is_required_with_at_least_one_source() -> None:
@@ -211,6 +198,11 @@ def test_a_token_shaped_value_is_rejected_wherever_it_appears() -> None:
         _recipe(features=[{"name": "value", "options": {TOKEN_LIKE: "x"}}]),
         r"features\[0\].options: a key looks like an API token",
     )
+    # Scanned before mloda's loader, which would echo an unknown item key.
+    error = _rejects(
+        _recipe(features=[{"name": "value", TOKEN_LIKE: 1}]), r"features\[0\]: a key looks like an API token"
+    )
+    assert TOKEN_LIKE not in str(error)
 
 
 def test_a_key_named_like_an_exempt_compliance_field_is_not_exempt() -> None:
@@ -298,7 +290,7 @@ def test_error_messages_never_echo_the_rejected_value(monkeypatch: pytest.Monkey
     cases: list[tuple[dict[str, Any], str]] = [
         (_recipe(features=[{"name": "value", "options": {"DestatisReader": TOKEN_LIKE}}]), "API token"),
         (_recipe(features=[{"name": "value", "options": {TOKEN_LIKE: "x"}}]), "API token"),
-        (_recipe(features=[{"name": TOKEN_LIKE, "bogus": 1}]), "unknown key"),
+        (_recipe(features=[{"name": TOKEN_LIKE, "bogus": 1}]), "API token"),
         (_recipe(features=[{"name": "value", "in_features": TOKEN_LIKE}]), "in_features"),
         (_recipe(compliance={"sources": [_source(dataset_uri=TOKEN_LIKE)]}), "URI with a scheme"),
         (_recipe(compliance={"sources": [_source(credential_env=[TOKEN_LIKE])]}), "env-var names only"),

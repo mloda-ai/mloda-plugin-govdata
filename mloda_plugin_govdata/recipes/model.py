@@ -32,32 +32,6 @@ def _forbid_extra() -> ConfigDict:
     return ConfigDict(extra="forbid")
 
 
-class FeatureItem(BaseModel):
-    """One object item of the mloda feature array; fields and cross-field rules mirror mloda's ``FeatureConfig``."""
-
-    model_config = _forbid_extra()
-
-    name: str = Field(min_length=1)
-    options: dict[str, Any] | None = None
-    in_features: list[str] | None = None
-    group_options: dict[str, Any] | None = None
-    context_options: dict[str, Any] | None = None
-    propagate_context_keys: list[str] | None = None
-    cascade_context_keys: list[str] | None = None
-    column_index: int | None = None
-    feature_group: str | None = None
-    implementation: str | list[str] | None = None
-
-    @model_validator(mode="after")
-    def _mloda_rules(self) -> FeatureItem:
-        if self.options and (self.group_options or self.context_options):
-            raise ValueError("options cannot be combined with group_options or context_options")
-        for key_field in ("propagate_context_keys", "cascade_context_keys"):
-            if getattr(self, key_field) and not self.context_options:
-                raise ValueError(f"{key_field} needs context_options")
-        return self
-
-
 class JoinSide(BaseModel):
     """One side of a link: the FeatureGroup class name, its key columns, and the node discriminator."""
 
@@ -132,33 +106,13 @@ class Compliance(BaseModel):
 
 
 class Recipe(BaseModel):
-    """The recipe file. ``features`` stays the raw mloda array so it reaches the loader verbatim."""
+    """The recipe file. ``features`` stays the raw mloda array: mloda's loader checks it (``parse_recipe`` runs it)."""
 
     model_config = _forbid_extra()
 
     features: list[str | dict[str, Any]] = Field(min_length=1)
     links: list[LinkSpec] = Field(default_factory=list)
     compliance: Compliance
-
-    @field_validator("features")
-    @classmethod
-    def _feature_items(cls, value: list[str | dict[str, Any]]) -> list[str | dict[str, Any]]:
-        allowed = set(FeatureItem.model_fields)
-        for position, item in enumerate(value):
-            if isinstance(item, str):
-                if not item:
-                    raise ValueError(f"features[{position}]: a feature name must not be empty")
-                continue
-            unknown = sorted(set(item) - allowed)
-            if unknown:
-                raise ValueError(
-                    f"features[{position}]: unknown key(s) {unknown}; mloda feature items allow {sorted(allowed)}"
-                )
-            try:
-                FeatureItem.model_validate(item)
-            except ValidationError as exc:
-                raise ValueError(f"features[{position}]: {error_summary(exc)}") from None
-        return value
 
     @field_validator("links")
     @classmethod

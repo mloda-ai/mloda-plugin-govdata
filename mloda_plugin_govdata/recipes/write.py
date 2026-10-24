@@ -80,7 +80,7 @@ def write_recipe(
 
 
 def _feature_item(feature: Feature, position: int) -> dict[str, Any]:
-    # Position only: a feature name is caller data and must not end up in an error message.
+    # Position only in the writer's own errors; mloda's loader names the item after the credential scan ran.
     where = f"features[{position}]"
     options = feature.options
     # What mloda derives from the options alone; a constructor argument that differs would be lost.
