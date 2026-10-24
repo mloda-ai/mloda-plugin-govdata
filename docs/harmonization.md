@@ -83,8 +83,8 @@ Feature(
 | configuration-based name | the group its options select | the same parts under that name (`destatis__bevoelkerung__kreise~value`); the source column goes in `in_features`, the parameters in the group options |
 
 - Names are ASCII (`bevoelkerung`, not `Bevölkerung`).
-- A part is lowercase letters and digits. An unknown one (`value__rebased~edition`) fails at match time,
-  before any fetch, and the error lists the group's parts.
+- Each group declares its parts (`OUTPUT_PARTS`). An unknown one (`value__rebased~edition`) fails while
+  features resolve, before any fetch, and the error lists the declared parts.
 - Over `DestatisReader`, a configuration-based name must contain `__`: the reader claims every other name its
   option is set for, and mloda then finds two groups. Over the other readers, name the group instead (see
   [Over other readers](#over-other-readers)).

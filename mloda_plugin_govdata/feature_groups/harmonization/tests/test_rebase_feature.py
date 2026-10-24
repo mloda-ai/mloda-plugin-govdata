@@ -11,7 +11,7 @@ import pyarrow as pa
 import pytest
 import respx
 from mloda.provider import FeatureSet
-from mloda.user import Feature, FeatureName, FeatureResolutionError, Options, mloda
+from mloda.user import Feature, FeatureName, FeatureResolutionError, Options, mloda, resolve_feature
 
 from mloda_plugin_govdata.feature_groups.destatis.core.auth import OPTION_GENESIS_CREDENTIALS, DestatisCredentials
 from mloda_plugin_govdata.feature_groups.destatis.reader import DestatisReader
@@ -31,7 +31,7 @@ from mloda_plugin_govdata.recipes import Compliance, SourceCompliance, build_rec
 from .conftest import COCHEM_ZELL_ZIP, EXTRACT, GOETTINGEN_LOCATOR, GOETTINGEN_ZIP, LAND_ZIP, ffcsv_zip_with_rows
 
 CONFIGURATION_BASED_NAME = "destatis__bevoelkerung__kreise"
-PARTS = KreisRebaseFeature.PARTS
+PARTS = KreisRebaseFeature.OUTPUT_PARTS
 YEARS = {"rebase_from_year": 2015, "rebase_to_year": 2016}
 
 
@@ -55,18 +55,32 @@ def _run(features: list[Feature | str]) -> Any:
 def test_matches_the_chained_and_the_configuration_based_name() -> None:
     years = Options(group=YEARS)
     assert KreisRebaseFeature.match_feature_group_criteria("value__rebased", years)
-    assert KreisRebaseFeature.match_feature_group_criteria("value__rebased~flag", years)
-    assert not KreisRebaseFeature.match_feature_group_criteria("value__rebased~edition", years)  # not a part
     assert not KreisRebaseFeature.match_feature_group_criteria("value__rebased", Options({}))  # the years are required
     assert not KreisRebaseFeature.match_feature_group_criteria("value", years)
     configured = Options(group=YEARS, context={"in_features": "value"})
     assert KreisRebaseFeature.match_feature_group_criteria(CONFIGURATION_BASED_NAME, configured)
-    assert KreisRebaseFeature.match_feature_group_criteria(f"{CONFIGURATION_BASED_NAME}~flag", configured)
-    assert not KreisRebaseFeature.match_feature_group_criteria(f"{CONFIGURATION_BASED_NAME}~edition", configured)
     assert not KreisRebaseFeature.match_feature_group_criteria(
         CONFIGURATION_BASED_NAME, Options(context={"in_features": "value"})
     )
     assert not KreisRebaseFeature.match_feature_group_criteria(CONFIGURATION_BASED_NAME, Options(group=YEARS))
+
+
+def test_parts_resolve_through_the_declared_output_parts() -> None:
+    # A ~part name never matches whole, so mloda reads it against OUTPUT_PARTS, configuration names included.
+    configured = Options(group=YEARS, context={"in_features": "value"})
+    years = Options(group=YEARS)
+    for name, options in (("value__rebased~flag", years), (f"{CONFIGURATION_BASED_NAME}~flag", configured)):
+        assert resolve_feature(name, options=options).feature_group is KreisRebaseFeature
+    for name, options in (("value__rebased~edition", years), (f"{CONFIGURATION_BASED_NAME}~edition", configured)):
+        assert "declared parts: ['key', 'year'" in _unknown_part(KreisRebaseFeature, name, options)
+
+
+def _unknown_part(group: type, name: str, options: Options) -> str:
+    """The resolution error for a part the group does not declare (mloda checks parts against OUTPUT_PARTS)."""
+    resolved = resolve_feature(name, options=options)
+    assert resolved.feature_group is None and resolved.error is not None
+    assert f"{group.__name__} (option value)" in resolved.error and "is not an output part" in resolved.error
+    return resolved.error
 
 
 def test_children_carry_the_locator_and_leave_the_group_keys_behind() -> None:
@@ -163,9 +177,18 @@ def test_an_unknown_part_is_refused_before_any_fetch_naming_the_parts(
     for feature in features:
         with pytest.raises(
             FeatureResolutionError,
-            match=r"KreisRebaseFeature \(feature name\): unknown part ~edition; "
-            r"KreisRebaseFeature returns ~key.*~provenance",
+            match=r"KreisRebaseFeature \(option value\): 'edition' is not an output part of '[^']+'; "
+            r"declared parts: \['key'.*'provenance'\]",
         ):
+            _run([feature])
+    configured = Options(group=options, context={"in_features": "value"})
+    refused = [
+        (Feature("value__rebased~key__nuts2024~nuts4", options=options), "'nuts4' is not an output part"),
+        (Feature("value__rebased~key~x", options=options), "'key~x' is a nested part"),
+        (Feature(f"{CONFIGURATION_BASED_NAME}~flag~x", configured), "'flag~x' is a nested part"),
+    ]
+    for feature, reason in refused:
+        with pytest.raises(FeatureResolutionError, match=reason):
             _run([feature])
     assert route.calls.call_count == 0
 

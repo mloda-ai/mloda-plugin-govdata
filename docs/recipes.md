@@ -48,8 +48,8 @@ recipe.compliance.sources[0].attribution  # what to print next to the result
 - `features`: mloda's feature-config array, handed to `load_features_from_config` unchanged. Items are
   feature names or objects with `name`, `options` (or `group_options` plus `context_options`),
   `in_features`, `propagate_context_keys`, `cascade_context_keys`, `column_index`, `feature_group` (a class
-  name). Reader locators are strings or dicts (the `DestatisLocator` dict form). Any other key fails at load
-  with the allowed set.
+  name), `implementation`. Reader locators are strings or dicts (the `DestatisLocator` dict form). mloda's
+  loader checks the items at load and names the failing one.
 - `links`: joins the feature array cannot express. `join` is `inner`, `left`, `right`, `outer`, `append`,
   or `union`; each side names the FeatureGroup class, its key columns, and, when both sides share a class,
   a `discriminator` of option key/value pairs picking the node. mloda matches a discriminator by exact
@@ -112,9 +112,9 @@ to reader code included. Regenerate the recipes and locks with
 
 The re-based recipe needs the BBSR key file in the cache (`KreisRebaseFeature.fetch_reference()`
 once). Running the Land recipe's own features returns them unjoined, one frame per source;
-`frames = frames_by_column(result)` picks a PyArrow frame by a column only it carries (`frames["value"]`,
-`frames["Nr"]`) and raises on a shared one, so for `kreis_foreigners_share.json`, whose two frames carry
-the same columns, iterate `result.frames()` instead. Check the Land names on each side with
+`result.frame_for("value")` and `result.frame_for("Nr")` pick each frame by the feature it requested;
+for `kreis_foreigners_share.json`, whose two selections request the same names, iterate `result.frames()`
+and tell them apart by `step.data_access_identity` (the table code). Check the Land names on each side with
 `feature_groups.harmonization.core.land_codes.check_land_names`. The links block lets a consumer
 FeatureGroup that needs a column from each side join them instead (mloda executes a join only for such a
 consumer); `feature_groups.land_population_per_voter.LandPopulationPerVoter` is one, computing population

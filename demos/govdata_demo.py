@@ -196,7 +196,7 @@ def _(mo):
     from mloda_plugin_govdata.feature_groups.harmonization import KreisRebaseFeature
     from mloda_plugin_govdata.feature_groups.harmonization.core.land_codes import check_land_names
     from mloda_plugin_govdata.feature_groups.land_population_per_voter import LandPopulationPerVoter
-    from mloda_plugin_govdata.recipes import frames_by_column, load_recipe
+    from mloda_plugin_govdata.recipes import load_recipe
 
     # Every Destatis cell takes a name from this cell, so mo.stop skips them all.
     _why = None
@@ -224,7 +224,6 @@ def _(mo):
         LandPopulationPerVoter,
         check_land_names,
         compliance_note,
-        frames_by_column,
         load_recipe,
         recipes,
     )
@@ -265,11 +264,11 @@ def _(mo):
 
 
 @app.cell
-def _(check_land_names, frames_by_column, load_recipe, mloda, recipes):
+def _(check_land_names, load_recipe, mloda, recipes):
     land_recipe = load_recipe(recipes / "land_population_per_voter.json")
-    _frames = frames_by_column(mloda.run_all(land_recipe.features, compute_frameworks=["PyArrowTable"]))
-    population_by_land = _frames["value"].to_pandas()
-    _election = _frames["Nr"].to_pandas()
+    _result = mloda.run_all(land_recipe.features, compute_frameworks=["PyArrowTable"])
+    population_by_land = _result.frame_for("value").to_pandas()
+    _election = _result.frame_for("Nr").to_pandas()
     voters_by_land = _election[_election["gehört zu"] == "99"]  # the Land rows; Bundesgebiet has no parent
     check_land_names(
         zip(population_by_land["1_variable_attribute_code"], population_by_land["1_variable_attribute_label"])

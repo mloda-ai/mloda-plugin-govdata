@@ -14,7 +14,7 @@ from mloda.provider import DefaultOptionKeys, FeatureSet, property_spec
 from mloda.user import Feature, FeatureName, Options
 
 from ..govdata.core.cache import CacheMissError, DownloadCache
-from .base import OPTIONAL_PART, HarmonizationFeature, offline_first
+from .base import HarmonizationFeature, offline_first
 from .core.rebase import (
     DEFAULT_TOLERANCE,
     KeySheet,
@@ -50,11 +50,20 @@ class KreisRebaseFeature(HarmonizationFeature):
     of strings, ``~issues`` and ``~provenance`` are JSON. The input rows do not survive.
     """
 
-    PREFIX_PATTERN = rf".*__rebased{OPTIONAL_PART}$"
+    PREFIX_PATTERN = r".*__rebased$"
     RECOGNITION_ONLY_PATTERN = True  # no capture: the name identifies the group, every value comes from Options
     MIN_IN_FEATURES = 1
     MAX_IN_FEATURES = 1
-    PARTS: ClassVar = ("key", "year", "value", "flag", "sources", "marker", "issues", "provenance")
+    OUTPUT_PARTS: ClassVar[tuple[str, ...]] = (
+        "key",
+        "year",
+        "value",
+        "flag",
+        "sources",
+        "marker",
+        "issues",
+        "provenance",
+    )
     PROPERTY_MAPPING: ClassVar = {
         "rebase_from_year": property_spec("Source Gebietsstand year, the key sheet's first year", context=False),
         "rebase_to_year": property_spec("Target Gebietsstand year, the key sheet's second year", context=False),
@@ -109,7 +118,7 @@ class KreisRebaseFeature(HarmonizationFeature):
         keys, source = cls.load_keys()
         results = {
             name: cls._rebase(table, cls.source_column(feature), feature.options, keys, source)
-            for name, feature in cls.by_base(features).items()
+            for name, feature in cls.by_name(features).items()
         }
         cls._check_aligned(results)
         columns: dict[str, pa.Array] = {}

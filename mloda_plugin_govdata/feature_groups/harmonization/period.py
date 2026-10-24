@@ -42,8 +42,7 @@ class AnnualPeriodFeature(HarmonizationFeature):
         table: pa.Table = data
         # Sorted, not the raw set, so append order is stable regardless of hash seed. run_all
         # re-derives the final column order itself in every column_ordering mode, so this is
-        # what a direct calculate_feature call (or by_base's collision winner) sees, not what
-        # run_all returns.
+        # what a direct calculate_feature call sees, not what run_all returns.
         for feature in features.get_sorted_features():
             source = cls.source_column(feature)
             starts = [_period_start(source, row, value) for row, value in enumerate(table.column(source).to_pylist())]
