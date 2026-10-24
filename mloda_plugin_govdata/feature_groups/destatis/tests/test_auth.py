@@ -1,12 +1,15 @@
 """Credentials: resolution order, host scoping, redaction in every text form, the missing-credentials message."""
 
+from typing import Any
+
 import pytest
-from mloda.user import Options
+from mloda.user import Credential, DataAccessCollection, Options
 
 from mloda_plugin_govdata.feature_groups.destatis.core.auth import (
     ENV_SUFFIXES,
     OPTION_GENESIS_CREDENTIALS,
     DestatisCredentials,
+    credentials_from_collection,
     explicit_credentials_from_options,
     resolve_credentials,
 )
@@ -142,3 +145,32 @@ def test_unknown_host_with_explicit_prefix() -> None:
     assert resolve_credentials(zensus, environ={"ZENSUS_TOKEN": TOKEN}).host == "zensus"
     with pytest.raises(ValueError, match="upper-case"):
         GenesisHost("x", "https://example.org/", "zensus", "https://example.org/", "x")
+
+
+def _collection(**credentials: Any) -> DataAccessCollection:
+    return DataAccessCollection(credentials={handle: Credential(entry) for handle, entry in credentials.items()})
+
+
+def test_a_host_key_tags_an_entry_and_a_database_login_is_never_taken() -> None:
+    # Handle tagging, foreign tokens and ambiguity run end to end in test_reader.py.
+    collection = _collection(
+        nrw={"host": " Regionalstatistik ", "user": USER, "password": PASSWORD},
+        db={"host": "db.example.org", "user": USER, "password": PASSWORD},
+    )
+    regional = credentials_from_collection(collection, REGIONALSTATISTIK)
+    assert regional is not None and (regional.host, regional.user) == ("regionalstatistik", USER)
+    assert credentials_from_collection(collection, GENESIS_ONLINE) is None
+    assert credentials_from_collection(None, GENESIS_ONLINE) is None
+
+
+@pytest.mark.parametrize(
+    ("entry", "match"),
+    [
+        ({"tokn": TOKEN}, r"'genesis' have unknown key\(s\) \['tokn'\]"),
+        ({"user": USER}, "'genesis': .*together"),
+    ],
+)
+def test_a_malformed_genesis_entry_is_named_without_its_values(entry: dict[str, str], match: str) -> None:
+    with pytest.raises(ValueError, match=match) as excinfo:
+        credentials_from_collection(_collection(genesis=entry), GENESIS_ONLINE)
+    assert TOKEN not in str(excinfo.value) and USER not in str(excinfo.value)

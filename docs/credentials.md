@@ -19,8 +19,18 @@ Credentials never go into the URL or the form body: the server ignores body cred
 ## Resolution order
 
 1. Explicit: `DestatisCredentials(host="genesis", token=...)` (or `user=..., password=...`) passed to `GenesisClient`, or in mloda `Options(context={"genesis_credentials": DestatisCredentials(...)})`. Only the instance is accepted (its repr is redacted; a plain dict would print its values with the options), and only in `context`: the key is refused in `group`, which is hashed and printed with the feature.
-2. Env vars of the host, chosen by the host prefix. Whitespace is stripped. A half-set pair (`GENESIS_USER` without `GENESIS_PASSWORD`, or the reverse) is an error, never a fallback to the token or to the other host.
-3. Otherwise `MissingCredentialsError` names the env vars and the registration page for that host. Nothing is sent.
+2. The run's `DataAccessCollection`, passed once to `run_all` and reaching every Destatis feature, chained ones included:
+
+   ```python
+   from mloda.user import Credential, DataAccessCollection
+
+   collection = DataAccessCollection(credentials={"genesis": Credential(token=...)})
+   mloda.run_all(features, data_access_collection=collection)
+   ```
+
+   An entry counts only when its handle is a host name (`genesis`, `regionalstatistik`) or it carries a `host` key, so another plugin's token is never sent to GENESIS. Keys are `host`, `token`, `user`, `password`. Several entries for one host are refused; keep one. The collection is checked while features resolve, so a misconfigured entry fails the run even when the table is cached.
+3. Env vars of the host, chosen by the host prefix. Whitespace is stripped. A half-set pair (`GENESIS_USER` without `GENESIS_PASSWORD`, or the reverse) is an error, never a fallback to the token or to the other host.
+4. Otherwise `MissingCredentialsError` names the env vars and the registration page for that host. Nothing is sent.
 
 Credentials scoped to one host are refused on the other (`WrongHostCredentialsError`), and env resolution never falls back across hosts.
 
@@ -45,7 +55,7 @@ A table over the host's download limit raises `GenesisResultTooLarge` (GENESIS s
 
 ## Redaction
 
-`repr` and `str` of `DestatisCredentials` and of the `logincheck` reply are redacted, and every `GenesisError` raised by `GenesisClient.call` (and the methods built on it) has the known secrets scrubbed from its text. The `Parameter` block that GENESIS echoes in each JSON reply loses `username` and `password` at parse time. Errors raised below that layer (transport errors, a `ValueError` from your own code) are not scrubbed. The fixture capture script (`scripts/capture_genesis_fixtures.py`) redacts secret values in any case or URL-encoding before writing and refuses to keep a file in which a secret survived.
+`repr` and `str` of `DestatisCredentials` and of the `logincheck` reply are redacted, and every `GenesisError` raised by `GenesisClient.call` (and the methods built on it) has the known secrets scrubbed from its text. The `Parameter` block that GENESIS echoes in each JSON reply loses `username` and `password` at parse time. Errors raised below that layer (transport errors, a `ValueError` from your own code) are not scrubbed, except that mloda masks collection tokens and passwords of 8 or more characters in every error and log of the run. The fixture capture script (`scripts/capture_genesis_fixtures.py`) redacts secret values in any case or URL-encoding before writing and refuses to keep a file in which a secret survived.
 
 ## Live tests
 

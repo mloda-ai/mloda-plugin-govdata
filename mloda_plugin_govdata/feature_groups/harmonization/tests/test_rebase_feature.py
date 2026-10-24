@@ -11,7 +11,16 @@ import pyarrow as pa
 import pytest
 import respx
 from mloda.provider import FeatureSet
-from mloda.user import Feature, FeatureName, FeatureResolutionError, Options, mloda, resolve_feature
+from mloda.user import (
+    Credential,
+    DataAccessCollection,
+    Feature,
+    FeatureName,
+    FeatureResolutionError,
+    Options,
+    mloda,
+    resolve_feature,
+)
 
 from mloda_plugin_govdata.feature_groups.destatis.core.auth import OPTION_GENESIS_CREDENTIALS, DestatisCredentials
 from mloda_plugin_govdata.feature_groups.destatis.reader import DestatisReader
@@ -417,6 +426,21 @@ def test_explicit_credentials_travel_from_the_derived_feature_to_the_reader(
     table = _run([feature])[0]
     assert table.num_rows == 5
     assert route.calls.call_count == 1
+
+
+@respx.mock
+def test_collection_credentials_reach_the_reader_under_a_derived_feature(
+    genesis: Callable[[str], respx.Route], extract_keys: None, no_genesis_env: None
+) -> None:
+    # No context plumbing: the run's collection reaches the Destatis input of the chain directly.
+    route = genesis(GOETTINGEN_ZIP)
+    result = mloda.run_all(
+        [Feature("value__rebased", options={DestatisReader.__name__: GOETTINGEN_LOCATOR, **YEARS})],
+        compute_frameworks=["PyArrowTable"],
+        data_access_collection=DataAccessCollection(credentials={"genesis": Credential(token="collection-token")}),
+    )
+    assert result[0].num_rows == 5
+    assert route.calls.last.request.headers["username"] == "collection-token"
 
 
 @respx.mock
