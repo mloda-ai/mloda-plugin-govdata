@@ -3,7 +3,7 @@
 import inspect
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -34,7 +34,7 @@ COMPLIANCE = Compliance(
             license="DL-DE-BY-2.0",
             attribution="(c) Statistisches Bundesamt (Destatis), 2026",
             dataset_uri="https://genesis.destatis.de/datenbank/online/statistic/12411/table/12411-0010",
-            retrieved_at=datetime(2026, 9, 8, tzinfo=timezone.utc),
+            retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
             sha256=LAND_SHA256,
             credential_env=["GENESIS_TOKEN"],
         )

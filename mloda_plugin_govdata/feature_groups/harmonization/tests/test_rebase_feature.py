@@ -3,7 +3,7 @@
 import csv
 import json
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +42,8 @@ from .conftest import COCHEM_ZELL_ZIP, EXTRACT, GOETTINGEN_LOCATOR, GOETTINGEN_Z
 CONFIGURATION_BASED_NAME = "destatis__bevoelkerung__kreise"
 PARTS = KreisRebaseFeature.OUTPUT_PARTS
 YEARS = {"rebase_from_year": 2015, "rebase_to_year": 2016}
+# mloda's refusal of an undeclared part; a nested part (``key~x``) gets it too, since a part matches only in full.
+UNKNOWN_PART = r"KreisRebaseFeature \(feature name\): '%s' is not an output part of '[^']+'; declared parts: \['key'"
 
 
 def _expected(path: Path) -> list[tuple[str, int, int, str, str]]:
@@ -88,7 +90,7 @@ def _unknown_part(group: type, name: str, options: Options) -> str:
     """The resolution error for a part the group does not declare (mloda checks parts against OUTPUT_PARTS)."""
     resolved = resolve_feature(name, options=options)
     assert resolved.feature_group is None and resolved.error is not None
-    assert f"{group.__name__} (option value)" in resolved.error and "is not an output part" in resolved.error
+    assert f"{group.__name__} (feature name)" in resolved.error and "is not an output part" in resolved.error
     return resolved.error
 
 
@@ -186,15 +188,14 @@ def test_an_unknown_part_is_refused_before_any_fetch_naming_the_parts(
     for feature in features:
         with pytest.raises(
             FeatureResolutionError,
-            match=r"KreisRebaseFeature \(option value\): 'edition' is not an output part of '[^']+'; "
-            r"declared parts: \['key'.*'provenance'\]",
+            match=UNKNOWN_PART % "edition" + r".*'provenance'\]",
         ):
             _run([feature])
     configured = Options(group=options, context={"in_features": "value"})
     refused = [
         (Feature("value__rebased~key__nuts2024~nuts4", options=options), "'nuts4' is not an output part"),
-        (Feature("value__rebased~key~x", options=options), "'key~x' is a nested part"),
-        (Feature(f"{CONFIGURATION_BASED_NAME}~flag~x", configured), "'flag~x' is a nested part"),
+        (Feature("value__rebased~key~x", options=options), UNKNOWN_PART % "key~x"),  # a nested part
+        (Feature(f"{CONFIGURATION_BASED_NAME}~flag~x", configured), UNKNOWN_PART % "flag~x"),
     ]
     for feature, reason in refused:
         with pytest.raises(FeatureResolutionError, match=reason):
@@ -351,7 +352,7 @@ def test_the_configuration_based_name_round_trips_through_a_recipe(
                 license="DL-DE-BY-2.0",
                 attribution="(c) Statistisches Bundesamt (Destatis), 2026",
                 dataset_uri="https://genesis.destatis.de/datenbank/online/statistic/12411/table/12411-0015",
-                retrieved_at=datetime(2026, 9, 12, tzinfo=timezone.utc),
+                retrieved_at=datetime(2026, 9, 12, tzinfo=UTC),
                 sha256="0" * 64,
                 credential_env=["GENESIS_TOKEN"],
             )

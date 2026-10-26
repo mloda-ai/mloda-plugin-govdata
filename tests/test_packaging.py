@@ -1,15 +1,10 @@
 """Packaging metadata: the wheel ships code only, the Python classifiers match CI, ruff matches the lock."""
 
 import re
-import sys
+import tomllib
 from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import cast
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DISTRIBUTION = REPO_ROOT / "mloda_plugin_govdata"

@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -96,7 +96,7 @@ class ShippedRecipe:
 
 
 def _at(year: int, month: int, day: int) -> datetime:
-    return datetime(year, month, day, tzinfo=timezone.utc)
+    return datetime(year, month, day, tzinfo=UTC)
 
 
 def _destatis(table: str, retrieved_at: datetime, sha256: str, *extra: str) -> SourceCompliance:

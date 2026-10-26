@@ -39,7 +39,7 @@ reader loads nothing outside entries 1 to 3.
 - **Reader selection by option key.** Every reader, `DestatisReader` included, is a pointed-only mloda source
   FeatureGroup under the abstract `GovDataFeature`. A feature picks its reader with an option keyed by the
   reader class or its class name; the value is what the reader's locator coerces. Docs: [source
-  FeatureGroups](https://github.com/mloda-ai/mloda/blob/0.17.0/docs/docs/in_depth/data-access-patterns.md#writing-a-source-featuregroup).
+  FeatureGroups](https://github.com/mloda-ai/mloda/blob/0.18.0/docs/docs/in_depth/data-access-patterns.md#writing-a-source-featuregroup).
 - **`__` chaining.** The harmonization groups use `FeatureChainParserMixin`: `value__rebased` names the
   source column and the operation; the configuration-based form carries the source in `in_features`. The
   reader option on the chained feature is forwarded to its source column. Only `DestatisReader` declines

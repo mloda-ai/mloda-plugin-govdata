@@ -16,7 +16,7 @@ import os
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -125,7 +125,7 @@ class ParameterCache:
     def __init__(self, cache_dir: str | os.PathLike[str], *, clock: Callable[[], datetime] | None = None) -> None:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self._clock = clock if clock is not None else lambda: datetime.now(timezone.utc)
+        self._clock = clock if clock is not None else lambda: datetime.now(UTC)
 
     def key(self, host: GenesisHost | str, endpoint: str, parameters: Mapping[str, object]) -> str:
         identity = {

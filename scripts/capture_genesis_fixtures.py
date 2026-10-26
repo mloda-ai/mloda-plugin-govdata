@@ -22,7 +22,7 @@ import sys
 import zipfile
 import zlib
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -88,7 +88,7 @@ def _write(out: Path, name: str, data: bytes, secrets: Sequence[str]) -> str:
 def _notice_line(
     out: Path, host: str, name: str, endpoint: str, params: Mapping[str, str], status: int, sha: str
 ) -> None:
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    stamp = datetime.now(UTC).strftime("%Y-%m-%d")
     shown = json.dumps(dict(params), ensure_ascii=False)
     line = (
         f"{name}\n"

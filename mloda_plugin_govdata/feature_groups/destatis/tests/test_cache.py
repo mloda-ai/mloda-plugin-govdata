@@ -4,7 +4,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Callable, Mapping
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -46,7 +46,7 @@ CANONICAL = {
     "language": "de",
     "format": "ffcsv",
 }
-T0 = datetime(2026, 8, 16, 12, 0, tzinfo=timezone.utc)
+T0 = datetime(2026, 8, 16, 12, 0, tzinfo=UTC)
 
 
 class Clock:

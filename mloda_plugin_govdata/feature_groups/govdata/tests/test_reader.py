@@ -4,7 +4,7 @@ import hashlib
 import inspect
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, ClassVar, cast
 
@@ -113,7 +113,7 @@ class FakeReader(BaseGovDataReader[_FakeLocator]):
         return FetchedPayload(
             path=path,
             sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
-            retrieved_at=datetime.now(timezone.utc),
+            retrieved_at=datetime.now(UTC),
             provenance=Provenance(source="fake", url=locator.describe()),
         )
 

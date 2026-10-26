@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib.metadata
 from collections.abc import Callable
 from types import TracebackType
-from typing import Any, TypeVar
+from typing import Any, Self
 
 import httpx
 from tenacity import RetryCallState, retry, retry_if_exception, stop_after_attempt, wait_exponential_jitter
@@ -18,20 +18,14 @@ MAX_RETRY_AFTER = 60.0  # cap a server's Retry-After so it cannot stall the clie
 
 _BASE_WAIT = wait_exponential_jitter(multiplier=0.5, max=10.0)
 
-_T = TypeVar("_T", bound="OwnedHttpClient")
-
 
 class OwnedHttpClient:
-    """Closes ``self._client`` on exit, but only when this instance built it rather than received it.
-
-    ``__enter__`` returns the subclass via a bound TypeVar rather than ``Self``: the package floor
-    is Python 3.10, one release before ``typing.Self``, and typing_extensions is not a dependency.
-    """
+    """Closes ``self._client`` on exit, but only when this instance built it rather than received it."""
 
     _owns_client: bool
     _client: httpx.Client
 
-    def __enter__(self: _T) -> _T:  # noqa: PYI019  (see class docstring)
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(
