@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, TypeVar, runtime_checkable
+from typing import Protocol, Self, runtime_checkable
 
 DEFAULT_CKAN_BASE = "https://ckan.govdata.de/api/3/action"
-
-_L = TypeVar("_L", bound="Locator")
 
 
 @runtime_checkable
@@ -17,9 +15,8 @@ class Locator(Protocol):
     The label names the dataset in messages and in lineage and audit records, so it never carries a credential.
     """
 
-    # PYI019 wants `Self`, which is 3.11+; the package floor is 3.10.
     @classmethod
-    def coerce(cls: type[_L], value: object) -> _L | None: ...  # noqa: PYI019
+    def coerce(cls, value: object) -> Self | None: ...
 
     def describe(self) -> str: ...
 

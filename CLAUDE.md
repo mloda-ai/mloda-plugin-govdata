@@ -65,7 +65,7 @@ Consider generating project-specific skills for your own plugin repository to pr
 
 `tox` is the gate. It runs `pytest`, then `ruff format --check`, `ruff check`, `mypy --strict --ignore-missing-imports`, and `bandit`. All of these must pass before a PR is mergeable. A separate `tox -e security` environment runs `pip-audit` for CVE scanning.
 
-- **Python**: supported range is `>=3.10`. The default tox env is `python310`.
+- **Python**: supported range is `>=3.11`. The default tox env is `checks`; the name is version-neutral since CI runs it under whichever interpreter each matrix leg sets up.
 - **Type hints**: use modern forms (`list[str]`, `dict[str, int]`, `X | None`).
 - **Formatting**: ruff format with line length 120.
 - **Tests**: every new feature or bug fix must come with tests; follow the patterns in the existing `tests/` and `mloda_plugin_govdata/.../tests/` trees.

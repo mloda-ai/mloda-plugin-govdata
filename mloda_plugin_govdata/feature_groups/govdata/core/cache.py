@@ -9,7 +9,7 @@ import os
 import re
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -141,7 +141,7 @@ class DownloadCache(OwnedHttpClient):
             raise PinMismatchError(f"{url}: downloaded sha256 {digest} does not match the pinned {pinned}")
         data_path = self.cache_dir / f"{digest}.bin"
         write_atomic(data_path, body)
-        retrieved_at = datetime.now(timezone.utc)
+        retrieved_at = datetime.now(UTC)
         meta: dict[str, Any] = {
             "url": url,
             "etag": response.headers.get("ETag"),

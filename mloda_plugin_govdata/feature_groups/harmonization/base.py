@@ -7,13 +7,10 @@ from pathlib import Path
 from typing import Any, ClassVar, TypeVar
 
 from mloda.provider import (
-    COLUMN_SEPARATOR,
-    NAME_STAGE,
     ComputeFramework,
     FeatureChainParserMixin,
     FeatureGroup,
     FeatureSet,
-    record_match_rejection,
 )
 from mloda.user import Feature, FeatureName, Options
 from mloda.user.pyarrow import PyArrowTable
@@ -68,21 +65,13 @@ class HarmonizationFeature(FeatureChainParserMixin, FeatureGroup):
     def match_feature_group_criteria(
         cls, feature_name: str | FeatureName, options: Options, data_access_collection: Any = None
     ) -> bool:
-        """A ``~part`` name never matches whole, so mloda reads it against OUTPUT_PARTS (configuration names too)."""
-        split = FeatureGroup.split_output_part(str(feature_name))
-        if not cls.OUTPUT_PARTS or split is None:
-            return super().match_feature_group_criteria(feature_name, options, data_access_collection)
-        base, part = split
-        if COLUMN_SEPARATOR in part and super().match_feature_group_criteria(base, options, data_access_collection):
-            reason = f"'{part}' is a nested part; {cls.__name__} returns one column per part: {list(cls.OUTPUT_PARTS)}"
-            record_match_rejection(cls.__name__, reason, stage=NAME_STAGE)
-        return False
+        """A ``~part`` name never matches whole, so mloda reads it against OUTPUT_PARTS.
 
-    @staticmethod
-    def split_output_part(name: str) -> tuple[str, str] | None:
-        """mloda's split without nested parts (``~flag~x``), which would otherwise only fail after the fetch."""
-        split = FeatureGroup.split_output_part(name)
-        return None if split is None or COLUMN_SEPARATOR in split[1] else split
+        Needed for configuration names, which match any name: mloda strips only a numeric ``~N`` before matching.
+        """
+        if cls.OUTPUT_PARTS and FeatureGroup.split_output_part(str(feature_name)) is not None:
+            return False
+        return super().match_feature_group_criteria(feature_name, options, data_access_collection)
 
     @classmethod
     def child(cls, name: str) -> Feature:
