@@ -1,7 +1,7 @@
 """mloda reader for a GENESIS ``data/tablefile`` selection (ffcsv).
 
 Flow, on the shared ``BaseGovDataReader`` seam:
-    _source_locator             pointer value -> DestatisLocator; declines chained and ``~part`` names
+    _source_locator             pointer value -> DestatisLocator; declines chained, ``~part`` and in_features names
     find_sources                binds the run's DataAccessCollection credentials for the host to the match
     _fetch                      locator.tablefile_fields() -> ParameterCache hit, or a GenesisClient POST
                                 on a miss (credentials: Options.context, then the collection, then env)
@@ -20,8 +20,10 @@ from mloda.provider import (
     CHAIN_SEPARATOR,
     COLUMN_SEPARATOR,
     ClaimRoute,
+    DefaultOptionKeys,
     FeatureSet,
     SourceMatch,
+    record_match_rejection,
 )
 from mloda.user import DataAccessCollection, Options
 
@@ -60,8 +62,15 @@ class DestatisReader(BaseGovDataReader[DestatisLocator]):
 
     @classmethod
     def _source_locator(cls, value: Any, feature_name: str, options: Options) -> DestatisLocator | None:
-        # An ffcsv column never carries mloda's chain or part separator, so such a name (``value__rebased``,
-        # ``kreise~key``) belongs to a derived group.
+        # A name carrying in_features belongs to a derived group, never to an ffcsv column.
+        if DefaultOptionKeys.in_features in options:
+            record_match_rejection(
+                cls.__name__,
+                f"'{feature_name}' carries in_features, so only a derived group computes it, and none matched; "
+                "check its options (a key missing or misspelled)",
+            )
+            return None
+        # So do names with a chain or part separator (``value__rebased``, ``kreise~key``).
         if CHAIN_SEPARATOR in feature_name or COLUMN_SEPARATOR in feature_name:
             return None
         return super()._source_locator(value, feature_name, options)

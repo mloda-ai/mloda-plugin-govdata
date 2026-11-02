@@ -85,11 +85,9 @@ Feature(
 - Names are ASCII (`bevoelkerung`, not `Bevölkerung`).
 - Each group declares its parts (`OUTPUT_PARTS`). An unknown one (`value__rebased~edition`) fails while
   features resolve, before any fetch, and the error lists the declared parts.
-- Over `DestatisReader`, prefer a configuration-based name with `__` (`destatis__bevoelkerung__kreise`): the
-  reader declines it, so options that select no group (the rebase years missing, say) fail while features
-  resolve, before any fetch. A plain name (`kreise`) works too, but when the options select no group the
-  reader takes it as a column: the run fails after the fetch with `Unknown feature(s) 'kreise'`, and a name
-  that is a column of the table (`value`) returns that raw column without an error.
+- Over `DestatisReader`, a configuration-based name (`destatis__bevoelkerung__kreise`, or plain `kreise`) whose
+  options select no group (the rebase years missing or misspelled, say) fails while features resolve, before
+  any fetch: the reader declines a name carrying `in_features` and says so in the error.
 - mloda returns one frame per FeatureGroup, so a reader column requested next to a harmonized feature lands
   in its own frame.
 
@@ -162,6 +160,6 @@ election date) is refused: the year a snapshot joins to is chosen where the join
 
 ## Over other readers
 
-`DestatisReader` leaves chained and `~part` names to these groups. The other readers step aside for a chained
-name another group computes, so a harmonized feature over them needs no scope: `Feature("Stichtag__year_period",
-options={StuttgartPopulationReader.__name__: slug})`. A `feature_group=` scope naming another group than the reader pointer is refused.
+`DestatisReader` leaves chained and `~part` names, and names carrying `in_features`, to these groups. The
+other readers step aside for a chained name another group computes, so a harmonized feature over them needs
+no scope: `Feature("Stichtag__year_period", options={StuttgartPopulationReader.__name__: slug})`. A `feature_group=` scope naming another group than the reader pointer is refused.

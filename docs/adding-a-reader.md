@@ -24,6 +24,6 @@ To connect a new dataset:
 
 **Fetch.** `_fetch(locator, options)` resolves the host, takes explicit credentials from `Options.context` (`explicit_credentials_from_options`), builds the wire fields (`DestatisLocator.tablefile_fields()`, which pins `format`, `job`, `compress` and `transpose`), and calls `ParameterCache.get_or_fetch(host, "data/tablefile", fields, fetch)`. The cache keys the reply by the canonical parameters and calls `fetch` on a miss only; `GenesisClient` resolves credentials (explicit, then env) on its first request, so a cached selection needs none. The cached payload becomes a `FetchedPayload` with a `Provenance` (source, endpoint URL, parameters), and its path goes to `_parse`, which unpacks the zip and parses the ffcsv.
 
-**Matching.** `_source_locator` declines any feature name containing mloda's chain or part separator (`value__rebased`, `kreise~key`), so the harmonization groups own those names.
+**Matching.** `_source_locator` declines any feature name containing mloda's chain or part separator (`value__rebased`, `kreise~key`) or carrying `in_features`, so the harmonization groups own those names.
 
 Tests live in `feature_groups/destatis/tests/`: replies are `respx` mocks over fixtures (live captures made with `scripts/capture_genesis_fixtures.py`, every secret redacted, plus documented and synthetic replies; the `NOTICE` there names each source), and the tests marked `live` and `genesis_live` run the real endpoints and skip with a visible reason when no credentials are set (see [credentials.md](credentials.md)).

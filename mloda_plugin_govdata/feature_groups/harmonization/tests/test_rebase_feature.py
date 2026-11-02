@@ -45,6 +45,7 @@ PARTS = KreisRebaseFeature.OUTPUT_PARTS
 YEARS = {"rebase_from_year": 2015, "rebase_to_year": 2016}
 # mloda's refusal of an undeclared part; a nested part (``key~x``) gets it too, since a part matches only in full.
 UNKNOWN_PART = r"KreisRebaseFeature \(feature name\): '%s' is not an output part of '[^']+'; declared parts: \['key'"
+CARRIES_IN_FEATURES = r"DestatisReader \(option value\): '%s' carries in_features, so only a derived group computes it"
 
 
 def _expected(path: Path) -> list[tuple[str, int, int, str, str]]:
@@ -122,16 +123,17 @@ def test_children_carry_the_locator_and_leave_the_group_keys_behind() -> None:
     }
 
 
-def test_the_destatis_reader_leaves_chained_names_to_the_derived_groups() -> None:
+def test_the_destatis_reader_leaves_chained_and_configured_names_to_the_derived_groups() -> None:
     assert DestatisReader._source_locator("12411-0015", "value__rebased", Options({})) is None
     assert DestatisReader._source_locator("12411-0015", "kreise~edition", Options({})) is None
+    assert DestatisReader._source_locator("12411-0015", "kreise", Options(context={"in_features": "value"})) is None
     assert DestatisReader._source_locator("12411-0015", "value", Options({})) is not None
 
 
 # --- Level 3: through mloda.run_all over the captured tables -------------------------------------
 
 
-@pytest.mark.parametrize("name", [CONFIGURATION_BASED_NAME, "kreise"])  # the reader steps aside for a plain name
+@pytest.mark.parametrize("name", [CONFIGURATION_BASED_NAME, "kreise"])  # the reader declines a plain name too
 @respx.mock
 def test_goettingen_series_through_the_configuration_based_name(
     name: str, genesis: Callable[[str], respx.Route], extract_keys: None, expected_dir: Path
@@ -485,43 +487,34 @@ def test_collection_credentials_reach_the_reader_under_a_derived_feature(
 
 
 @pytest.mark.parametrize(
-    ("name", "context", "error", "fetches"),
+    ("name", "group", "context", "error"),
     [
-        ("value__rebased", {}, "rebase_from_year, rebase_to_year are absent", 0),
-        # The reader declines a `__` name, so nothing claims it and resolution fails before the fetch.
+        ("value__rebased", {}, {}, "rebase_from_year, rebase_to_year are absent"),
+        # The reader declines a name carrying in_features, so nothing claims it, a column name (`value`) included.
+        (CONFIGURATION_BASED_NAME, {}, {"in_features": "value"}, CARRIES_IN_FEATURES % CONFIGURATION_BASED_NAME),
+        ("kreise", {}, {"in_features": "value"}, CARRIES_IN_FEATURES % "kreise"),
         (
-            CONFIGURATION_BASED_NAME,
+            "value",
+            {"rebase_from_yaer": 2015, "rebase_to_year": 2016},  # misspelled
             {"in_features": "value"},
-            f"No feature groups found for feature name: '{CONFIGURATION_BASED_NAME}'",
-            0,
+            CARRIES_IN_FEATURES % "value",
         ),
-        # The reader takes a plain name as a column and fails only on the fetched table.
-        ("kreise", {"in_features": "value"}, r"Unknown feature\(s\) 'kreise'", 1),
     ],
 )
 @respx.mock
-def test_missing_years_fail_before_the_fetch_unless_the_name_is_plain(
+def test_options_selecting_no_group_fail_before_the_fetch(
     name: str,
+    group: dict[str, int],
     context: dict[str, str],
     error: str,
-    fetches: int,
     genesis: Callable[[str], respx.Route],
     extract_keys: None,
 ) -> None:
     route = genesis(GOETTINGEN_ZIP)
+    options = Options(group={DestatisReader.__name__: GOETTINGEN_LOCATOR, **group}, context=context)
     with pytest.raises(ValueError, match=error):
-        _run([Feature(name, Options(group={DestatisReader.__name__: GOETTINGEN_LOCATOR}, context=context))])
-    assert route.calls.call_count == fetches
-
-
-@respx.mock
-def test_missing_years_on_a_plain_column_name_return_the_raw_column(
-    genesis: Callable[[str], respx.Route], extract_keys: None
-) -> None:
-    genesis(GOETTINGEN_ZIP)
-    options = Options(group={DestatisReader.__name__: GOETTINGEN_LOCATOR}, context={"in_features": "value"})
-    table = _run([Feature("value", options)])[0]
-    assert (table.schema.names, table.num_rows) == (["value"], 15)  # not re-based: the input rows, no parts
+        _run([Feature(name, options)])
+    assert route.calls.call_count == 0
 
 
 @respx.mock
