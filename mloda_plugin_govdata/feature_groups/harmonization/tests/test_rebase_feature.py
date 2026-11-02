@@ -131,28 +131,29 @@ def test_the_destatis_reader_leaves_chained_names_to_the_derived_groups() -> Non
 # --- Level 3: through mloda.run_all over the captured tables -------------------------------------
 
 
+@pytest.mark.parametrize("name", [CONFIGURATION_BASED_NAME, "kreise"])  # the reader steps aside for a plain name
 @respx.mock
 def test_goettingen_series_through_the_configuration_based_name(
-    genesis: Callable[[str], respx.Route], extract_keys: None, expected_dir: Path
+    name: str, genesis: Callable[[str], respx.Route], extract_keys: None, expected_dir: Path
 ) -> None:
     route = genesis(GOETTINGEN_ZIP)
     feature = Feature(
-        CONFIGURATION_BASED_NAME,
+        name,
         Options(group={DestatisReader.__name__: GOETTINGEN_LOCATOR, **YEARS}, context={"in_features": "value"}),
     )
     result = _run([feature])
     table = result[0]
 
-    assert sorted(table.schema.names) == sorted(f"{CONFIGURATION_BASED_NAME}~{part}" for part in PARTS)
-    assert _cells(table, CONFIGURATION_BASED_NAME) == _expected(expected_dir / "expected-goettingen-2016.csv")
-    assert table.column(f"{CONFIGURATION_BASED_NAME}~value").to_pylist() == [
+    assert sorted(table.schema.names) == sorted(f"{name}~{part}" for part in PARTS)
+    assert _cells(table, name) == _expected(expected_dir / "expected-goettingen-2016.csv")
+    assert table.column(f"{name}~value").to_pylist() == [
         322616.0,
         324013.0,
         329538.0,
         327065.0,
         328036.0,
     ]
-    assert table.column(f"{CONFIGURATION_BASED_NAME}~marker").to_pylist() == [""] * 5
+    assert table.column(f"{name}~marker").to_pylist() == [""] * 5
     assert route.calls.call_count == 1
     steps = [step.feature_group_name for step in result.plan if step.step_kind == "compute"]
     assert steps == ["DestatisReader", "KreisRebaseFeature"]
@@ -483,11 +484,44 @@ def test_collection_credentials_reach_the_reader_under_a_derived_feature(
     assert route.calls.last.request.headers["username"] == "collection-token"
 
 
+@pytest.mark.parametrize(
+    ("name", "context", "error", "fetches"),
+    [
+        ("value__rebased", {}, "rebase_from_year, rebase_to_year are absent", 0),
+        # The reader declines a `__` name, so nothing claims it and resolution fails before the fetch.
+        (
+            CONFIGURATION_BASED_NAME,
+            {"in_features": "value"},
+            f"No feature groups found for feature name: '{CONFIGURATION_BASED_NAME}'",
+            0,
+        ),
+        # The reader takes a plain name as a column and fails only on the fetched table.
+        ("kreise", {"in_features": "value"}, r"Unknown feature\(s\) 'kreise'", 1),
+    ],
+)
 @respx.mock
-def test_missing_years_raise_a_clear_error(genesis: Callable[[str], respx.Route], extract_keys: None) -> None:
+def test_missing_years_fail_before_the_fetch_unless_the_name_is_plain(
+    name: str,
+    context: dict[str, str],
+    error: str,
+    fetches: int,
+    genesis: Callable[[str], respx.Route],
+    extract_keys: None,
+) -> None:
+    route = genesis(GOETTINGEN_ZIP)
+    with pytest.raises(ValueError, match=error):
+        _run([Feature(name, Options(group={DestatisReader.__name__: GOETTINGEN_LOCATOR}, context=context))])
+    assert route.calls.call_count == fetches
+
+
+@respx.mock
+def test_missing_years_on_a_plain_column_name_return_the_raw_column(
+    genesis: Callable[[str], respx.Route], extract_keys: None
+) -> None:
     genesis(GOETTINGEN_ZIP)
-    with pytest.raises(ValueError, match="rebase_from_year, rebase_to_year are absent"):
-        _run([Feature("value__rebased", options={DestatisReader.__name__: GOETTINGEN_LOCATOR})])
+    options = Options(group={DestatisReader.__name__: GOETTINGEN_LOCATOR}, context={"in_features": "value"})
+    table = _run([Feature("value", options)])[0]
+    assert (table.schema.names, table.num_rows) == (["value"], 15)  # not re-based: the input rows, no parts
 
 
 @respx.mock

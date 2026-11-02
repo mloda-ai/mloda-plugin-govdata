@@ -85,9 +85,11 @@ Feature(
 - Names are ASCII (`bevoelkerung`, not `Bevölkerung`).
 - Each group declares its parts (`OUTPUT_PARTS`). An unknown one (`value__rebased~edition`) fails while
   features resolve, before any fetch, and the error lists the declared parts.
-- Over `DestatisReader`, a configuration-based name must contain `__`: the reader claims every other name its
-  option is set for, and mloda then finds two groups. Over the other readers, name the group instead (see
-  [Over other readers](#over-other-readers)).
+- Over `DestatisReader`, prefer a configuration-based name with `__` (`destatis__bevoelkerung__kreise`): the
+  reader declines it, so options that select no group (the rebase years missing, say) fail while features
+  resolve, before any fetch. A plain name (`kreise`) works too, but when the options select no group the
+  reader takes it as a column: the run fails after the fetch with `Unknown feature(s) 'kreise'`, and a name
+  that is a column of the table (`value`) returns that raw column without an error.
 - mloda returns one frame per FeatureGroup, so a reader column requested next to a harmonized feature lands
   in its own frame.
 
