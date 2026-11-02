@@ -48,6 +48,10 @@ class LandPopulationPerVoter(FeatureGroup):
         return {PyArrowTable}
 
     @classmethod
+    def replaces_rows(cls) -> bool:
+        return True
+
+    @classmethod
     def feature_names_supported(cls) -> set[str]:
         return {cls.NAME}
 

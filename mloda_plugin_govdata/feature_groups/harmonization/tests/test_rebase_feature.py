@@ -10,7 +10,7 @@ from typing import Any
 import pyarrow as pa
 import pytest
 import respx
-from mloda.provider import FeatureSet
+from mloda.provider import FeatureGroup, FeatureSet
 from mloda.user import (
     Credential,
     DataAccessCollection,
@@ -18,6 +18,7 @@ from mloda.user import (
     FeatureName,
     FeatureResolutionError,
     Options,
+    PluginCollector,
     mloda,
     resolve_feature,
 )
@@ -265,6 +266,44 @@ def test_two_parts_of_one_output_in_one_request(genesis: Callable[[str], respx.R
     table = _run([Feature("value__rebased~key", options=options), Feature("value__rebased~value", options=options)])[0]
     assert sorted(table.schema.names) == ["value__rebased~key", "value__rebased~value"]
     assert table.num_rows == 5
+
+
+@respx.mock
+def test_a_raw_column_next_to_the_rebased_output_keeps_its_rows(
+    genesis: Callable[[str], respx.Route], extract_keys: None
+) -> None:
+    genesis(GOETTINGEN_ZIP)
+    locator = {DestatisReader.__name__: GOETTINGEN_LOCATOR}
+    result = _run([Feature("value__rebased~value", options={**locator, **YEARS}), Feature("time", options=locator)])
+    rows = {tuple(table.schema.names): table.num_rows for table in result}
+    assert rows == {("value__rebased~value",): 5, ("time",): 15}
+
+
+class _ReadsRebasedAndRaw(FeatureGroup):
+    """Reads the re-based output and a raw reader column without a Link."""
+
+    @classmethod
+    def feature_names_supported(cls) -> set[str]:
+        return {"_reads_rebased_and_raw"}
+
+    def input_features(self, options: Options, feature_name: FeatureName) -> set[Feature] | None:
+        locator = {DestatisReader.__name__: GOETTINGEN_LOCATOR}
+        return {Feature("value__rebased~value", options={**locator, **YEARS}), Feature("time", options=locator)}
+
+    @classmethod
+    def calculate_feature(cls, data: Any, features: FeatureSet) -> Any:
+        raise AssertionError("planning refuses this consumer")
+
+
+def test_a_consumer_of_the_rebased_output_and_a_raw_column_needs_a_link() -> None:
+    with pytest.raises(ValueError, match=r"KreisRebaseFeature .*on different frames"):
+        mloda.explain(
+            [Feature("_reads_rebased_and_raw")],
+            compute_frameworks=["PyArrowTable"],
+            plugin_collector=PluginCollector.enabled_feature_groups(
+                {DestatisReader, KreisRebaseFeature, _ReadsRebasedAndRaw}
+            ),
+        )
 
 
 def _stub_result(*pairs: tuple[str, int]) -> RebaseResult:
