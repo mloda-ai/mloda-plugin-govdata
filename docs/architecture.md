@@ -60,6 +60,7 @@ reader loads nothing outside entries 1 to 3.
   it raises by default when the output would be wrong, with a policy option to flag instead. The wrapper is a
   `HarmonizationFeature` subclass in `feature_groups/harmonization/` (model it on `nuts.py`, which wraps
   `core/nuts.py`), exported from that package's `__init__.py`, since importing it is what registers it.
+  A wrapper whose output has other rows than its input declares `replaces_rows()` (see `rebase.py`).
   Document it in [harmonization.md](harmonization.md).
 - **Add a recipe:** [recipes.md](recipes.md). Add its definition to `RECIPES` in the repository-root `scripts/write_recipes.py`
   and run `uv run python scripts/write_recipes.py`; `recipes/tests/test_shipped.py` pins each file to its

@@ -8,8 +8,9 @@ import httpx
 import pyarrow as pa
 import pytest
 import respx
+from mloda.provider import FeatureGroup, FeatureSet
 from mloda.steward import Extender, ExtenderHook, HookContext
-from mloda.user import Feature, PluginCollector, mloda
+from mloda.user import Feature, FeatureName, Options, PluginCollector, mloda
 
 from mloda_plugin_govdata.feature_groups.destatis import DestatisReader, parse_ffcsv_zip
 from mloda_plugin_govdata.feature_groups.destatis.core.hosts import GENESIS_ONLINE
@@ -139,3 +140,46 @@ def test_each_source_keeps_its_own_name_for_extenders(tmp_path: Path, monkeypatc
         DestatisReader.__name__: {"license": "DL-DE-BY-2.0"},
         BundeswahlleiterinReader.__name__: {},
     }
+
+
+@respx.mock
+def test_a_raw_column_next_to_the_land_ratio_keeps_its_rows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _mock_both_sources(tmp_path, monkeypatch)
+    result = mloda.run_all(
+        [Feature(LandPopulationPerVoter.NAME), Feature("value", options={DestatisReader.__name__: LAND_LOCATOR})],
+        compute_frameworks=["PyArrowTable"],
+        plugin_collector=PluginCollector.enabled_feature_groups(
+            {DestatisReader, BundeswahlleiterinReader, LandPopulationPerVoter}
+        ),
+    )
+    rows = {frozenset(table.schema.names): table.num_rows for table in result}
+    assert rows == {frozenset({"value"}): 16, frozenset(f"{LandPopulationPerVoter.NAME}~{part}" for part in PARTS): 16}
+    (raw,) = [table for table in result if table.schema.names == ["value"]]
+    # The reader's own frame, unsorted: the ratio's sort did not reach it.
+    assert raw.column("value").to_pylist() == parse_ffcsv_zip(LAND_TABLE_ZIP.read_bytes()).column("value").to_pylist()
+
+
+class _ReadsLandRatioAndRaw(FeatureGroup):
+    """Reads the Land ratio and a raw reader column without a Link."""
+
+    @classmethod
+    def feature_names_supported(cls) -> set[str]:
+        return {"_reads_land_ratio_and_raw"}
+
+    def input_features(self, options: Options, feature_name: FeatureName) -> set[Feature] | None:
+        return {Feature(LandPopulationPerVoter.NAME), Feature("value", options={DestatisReader.__name__: LAND_LOCATOR})}
+
+    @classmethod
+    def calculate_feature(cls, data: Any, features: FeatureSet) -> Any:
+        raise AssertionError("planning refuses this consumer")
+
+
+def test_a_consumer_of_the_land_ratio_and_a_raw_column_needs_a_link() -> None:
+    with pytest.raises(ValueError, match=r"LandPopulationPerVoter .*on different frames"):
+        mloda.explain(
+            [Feature("_reads_land_ratio_and_raw")],
+            compute_frameworks=["PyArrowTable"],
+            plugin_collector=PluginCollector.enabled_feature_groups(
+                {DestatisReader, BundeswahlleiterinReader, LandPopulationPerVoter, _ReadsLandRatioAndRaw}
+            ),
+        )

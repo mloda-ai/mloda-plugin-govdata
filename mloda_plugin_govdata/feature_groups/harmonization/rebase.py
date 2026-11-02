@@ -89,6 +89,10 @@ class KreisRebaseFeature(HarmonizationFeature):
     }
 
     @classmethod
+    def replaces_rows(cls) -> bool:
+        return True
+
+    @classmethod
     def _read_reference(cls, cache: DownloadCache, *, fetch: bool = False) -> list[UmsteigeschluesselRow]:
         return offline_first(partial(load_bbsr_kreise, cache), fetch=fetch)
 
