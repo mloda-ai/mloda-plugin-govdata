@@ -43,7 +43,7 @@ reader loads nothing outside entries 1 to 3.
 - **`__` chaining.** The harmonization groups use `FeatureChainParserMixin`: `value__rebased` names the
   source column and the operation; the configuration-based form carries the source in `in_features`. The
   reader option on the chained feature is forwarded to its source column. Only `DestatisReader` declines
-  chained names, so a chained feature over another reader names its group (see
+  chained names; the other readers step aside for a name another group computes once that group's inputs resolve (see
   [harmonization.md](harmonization.md#over-other-readers)). Guides: [chained features](https://github.com/mloda-ai/mloda-registry/blob/main/docs/guides/feature-group-patterns/03-chained-features.md),
   [input feature forwarding](https://github.com/mloda-ai/mloda-registry/blob/main/docs/guides/feature-group-patterns/26-input-feature-forwarding.md).
 - **`~` multi-output columns.** A result with several parts comes back as `<name>~<part>` columns
