@@ -48,7 +48,8 @@ recipe.compliance.sources[0].attribution  # what to print next to the result
 - `features`: mloda's feature-config array, handed to `load_features_from_config` unchanged. Items are
   feature names or objects with `name`, `options` (or `group_options` plus `context_options`),
   `in_features`, `propagate_context_keys`, `cascade_context_keys`, `column_index`, `feature_group` (a class
-  name), `implementation`. Reader locators are strings or dicts (the `DestatisLocator` dict form). mloda's
+  name), `implementation`, `keep_index`, and `index` (the feature's key: the link side it binds and the
+  columns `keep_index` returns). Reader locators are strings or dicts (the `DestatisLocator` dict form). mloda's
   loader checks the items at load and names the failing one.
 - `links`: joins the feature array cannot express. `join` is `inner`, `left`, `right`, `outer`, `append`,
   or `union`; each side names the FeatureGroup class, its key columns, and, when both sides share a class,
@@ -66,11 +67,11 @@ recipe.compliance.sources[0].attribution  # what to print next to the result
 The writer covers the option values this plugin produces: strings, finite numbers, booleans, lists, dicts,
 a `DestatisLocator` (its dict form, `None` fields omitted), a `GovDataLocator` with default `ckan_base` and
 `resource_index` and one of slug or URL (that string), `in_features` (in the given order; a set is sorted),
-the `feature_group` scope, `propagate_context_keys`, and `cascade_context_keys`. Anything else raises instead
-of being dropped: a tuple or set value (pass a list), a `Feature` with `data_type`, `index`,
-`initial_requested_data`, `required_declarations`, a forwarding directive, or a `compute_framework` set
-through the constructor that differs from the options, a nested `Feature` inside `in_features`, pushing
-`in_features` itself to inputs, or an `asof` link. A `domain`, from the constructor or the options, is
+the `feature_group` scope, `propagate_context_keys`, `cascade_context_keys`, `keep_index`, and `index`
+(its columns as a list). Anything else raises instead of being dropped: a tuple or set value (pass a list),
+a `Feature` with `data_type`, `initial_requested_data`, `required_declarations`, a forwarding directive, or
+a `compute_framework` set through the constructor that differs from the options, a nested `Feature` inside
+`in_features`, pushing `in_features` itself to inputs, or an `asof` link. A `domain`, from the constructor or the options, is
 written to the `domain` option key, which mloda reads back. A link set on a `Feature` is hoisted into
 `links`. The writer runs its output through the loader, so it never writes a file `load_recipe` refuses.
 

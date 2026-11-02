@@ -21,19 +21,17 @@ IN_FEATURES = "in_features"
 # Feature constructor parameters the mloda feature config can carry (the rest must be at their defaults).
 # domain rides in the "domain" option key: mloda reads it from there and pops it on construction.
 SUPPORTED_FEATURE_PARAMETERS: frozenset[str] = frozenset(
-    {"name", "options", "link", "feature_group", "domain", "implementation"}
+    {"name", "options", "link", "feature_group", "domain", "implementation", "keep_index", "index"}
 )
 # Attribute name, its default, and the option key mloda also reads it from (then it round-trips with the options).
 _UNSUPPORTED: tuple[tuple[str, Any, str | None], ...] = (
     ("data_type", None, None),
-    ("index", None, None),
     ("compute_frameworks", None, "compute_framework"),
     ("initial_requested_data", False, None),
     ("forward_group", None, None),
     ("forward_group_exclude", frozenset(), None),
     ("inherit_context_keys", frozenset(), None),
     ("required_declarations", None, None),
-    ("keep_index", False, None),
     ("_connection_holder", None, None),
 )
 
@@ -91,8 +89,8 @@ def _feature_item(feature: Feature, position: int) -> dict[str, Any]:
             continue
         raise RecipeError(
             f"{where}: Feature.{attribute} has no recipe form; "
-            "a recipe carries name, options, in_features, feature_group, implementation, propagate_context_keys, "
-            "and cascade_context_keys"
+            "a recipe carries name, options, in_features, feature_group, implementation, keep_index, index, "
+            "propagate_context_keys, and cascade_context_keys"
         )
     if IN_FEATURES in options.group:
         raise RecipeError(
@@ -126,11 +124,16 @@ def _feature_item(feature: Feature, position: int) -> dict[str, Any]:
     pin = feature.implementation_pin
     if pin is not None:
         item["implementation"] = pin[0] if len(pin) == 1 else list(pin)
+    if feature.keep_index:
+        item["keep_index"] = True
+    if feature.index is not None:
+        if not isinstance(feature.index, Index):
+            raise RecipeError(f"{where}: Feature.index must be an Index")
+        item["index"] = list(feature.index.index)
     return item
 
 
 def _same(value: Any, other: Any) -> bool:
-    # Index.__eq__ raises on a non-Index, so identity comes first and None never reaches __eq__.
     if value is other:
         return True
     if value is None or other is None:
