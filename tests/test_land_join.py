@@ -15,7 +15,7 @@ from mloda.user import Feature, FeatureName, Options, PluginCollector, mloda
 from mloda_plugin_govdata.feature_groups.destatis import DestatisReader, parse_ffcsv_zip
 from mloda_plugin_govdata.feature_groups.destatis.core.hosts import GENESIS_ONLINE
 from mloda_plugin_govdata.feature_groups.govdata import BundeswahlleiterinReader, GovDataLocator
-from mloda_plugin_govdata.feature_groups.harmonization.core.land_codes import check_land_names
+from mloda_plugin_govdata.feature_groups.harmonization import check_land_names
 from mloda_plugin_govdata.feature_groups.land_population_per_voter import (
     KERG_URL,
     LAND_LOCATOR,

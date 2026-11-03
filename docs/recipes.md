@@ -116,7 +116,7 @@ once). Running the Land recipe's own features returns them unjoined, one frame p
 `result.frame_for("value")` and `result.frame_for("Nr")` pick each frame by the feature it requested;
 for `kreis_foreigners_share.json`, whose two selections request the same names, iterate `result.frames()`
 and tell them apart by `step.data_access_identity` (the table code). Check the Land names on each side with
-`feature_groups.harmonization.core.land_codes.check_land_names`. The links block lets a consumer
+`feature_groups.harmonization.check_land_names`. The links block lets a consumer
 FeatureGroup that needs a column from each side join them instead (mloda executes a join only for such a
 consumer); `feature_groups.land_population_per_voter.LandPopulationPerVoter` is one, computing population
 per voter; its population input carries the link, so it also runs without `links=`.
