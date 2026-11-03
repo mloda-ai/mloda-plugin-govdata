@@ -4,7 +4,7 @@
       "compute_framework": "mloda_plugins.compute_framework.base_implementations.pyarrow.table:PyArrowTable",
       "compute_framework_reason": "only allowed framework",
       "feature_group": "mloda_plugin_govdata.feature_groups.govdata.population:StuttgartPopulationReader",
-      "feature_group_hash": "5426bb45448af06f4ee1deb6af135623ed266e2656d897e7015ce18d51fff7bf",
+      "feature_group_hash": "dcbc4e9f5468e383a6cb9866a7c03c1515050c30a9fac90fdfede014c47ed90d",
       "feature_names": [
         "Alter in 10 Gruppen",
         "Einwohner",

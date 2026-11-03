@@ -4,7 +4,7 @@
       "compute_framework": "mloda_plugins.compute_framework.base_implementations.pyarrow.table:PyArrowTable",
       "compute_framework_reason": "only allowed framework",
       "feature_group": "mloda_plugin_govdata.feature_groups.destatis.reader:DestatisReader",
-      "feature_group_hash": "81538acf5d7e36914a9d5e3ff351e972215746f1e832fd25376202dfb2f3ef71",
+      "feature_group_hash": "7d9e7aff312fc17d3e9430d23cd5bf0b46feba6c040b749930cbe64319db9829",
       "feature_names": [
         "1_variable_attribute_code",
         "value"

@@ -571,6 +571,10 @@ def test_base_reader_declines_unusable_data_access() -> None:
     assert BaseGovDataReader._source_locator(object(), "a", Options({})) is None
     assert isinstance(BaseGovDataReader._source_locator(SLUG, "a", Options({})), GovDataLocator)
     assert GovDataReader.find_sources(GovDataReader.CLAIM_ROUTES[0], "a", Options({"other": SLUG}), None) == []
+    for reader, value in ((GovDataReader, SLUG), (UbaAirReader, True)):  # UBA's _source_locator skips super
+        configured = Options({reader.__name__: value, "in_features": "x"})
+        assert _match(reader, value)
+        assert reader.find_sources(reader.CLAIM_ROUTES[0], "a", configured, None) == []
 
 
 @respx.mock
