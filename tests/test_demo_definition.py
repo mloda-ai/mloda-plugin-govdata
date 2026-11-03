@@ -41,10 +41,11 @@ def test_globs_find_all_notebooks_and_docs() -> None:
         REPO_ROOT / "tutorials" / "02_elections_and_air_quality.py",
         REPO_ROOT / "tutorials" / "03_destatis_table.py",
         REPO_ROOT / "tutorials" / "04_todays_borders.py",
+        REPO_ROOT / "tutorials" / "05_recipes_and_provenance.py",
     }
     assert expected <= set(NOTEBOOK_PATHS)
-    tutorials = REPO_ROOT / "tutorials"
-    assert {DEMO_PATH, tutorials / "03_destatis_table.py", tutorials / "04_todays_borders.py"} <= set(GUARDED_PATHS)
+    guarded = ("03_destatis_table.py", "04_todays_borders.py", "05_recipes_and_provenance.py")
+    assert {DEMO_PATH, *(REPO_ROOT / "tutorials" / name for name in guarded)} <= set(GUARDED_PATHS)
     assert {REPO_ROOT / "README.md", REPO_ROOT / "docs" / "schnellstart.md"} <= set(DOC_PATHS)
 
 
@@ -94,10 +95,11 @@ def _python_trees(path: Path) -> list[ast.Module]:
     return [ast.parse(block, filename=f"{path.name}, python block {n}") for n, block in enumerate(blocks, 1)]
 
 
-def _recipe_files_the_demo_loads() -> set[str]:
+def _recipe_files_the_notebooks_load() -> set[str]:
     calls = [
         node
-        for node in ast.walk(_demo_tree())
+        for path in NOTEBOOK_PATHS
+        for node in ast.walk(_demo_tree(path))
         if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "load_recipe"
     ]
     return {
@@ -108,8 +110,8 @@ def _recipe_files_the_demo_loads() -> set[str]:
     }
 
 
-def test_every_recipe_file_the_demo_loads_is_shipped() -> None:
-    names = _recipe_files_the_demo_loads()
+def test_every_recipe_file_a_notebook_loads_is_shipped() -> None:
+    names = _recipe_files_the_notebooks_load()
     assert names, "the recipe chapters load recipe files"
     assert [name for name in sorted(names) if not (RECIPES_DIR / name).is_file()] == []
 
