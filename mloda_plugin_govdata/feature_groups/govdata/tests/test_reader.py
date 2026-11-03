@@ -13,7 +13,7 @@ import pyarrow as pa
 import pytest
 import respx
 from mloda.provider import FeatureSet, SourceMatch
-from mloda.user import DataType, Feature, FeatureName, Options, mloda
+from mloda.user import DataType, Feature, Options, mloda
 
 from mloda_plugin_govdata.feature_groups.govdata.bundeswahlleiterin import (
     OPTION_WAHL_HEADER_ROWS,
@@ -69,17 +69,6 @@ def _match(reader: type[BaseGovDataReader[Any]], value: object) -> SourceMatch:
     """The source a reader finds for one pointer value."""
     [match] = reader.find_sources(reader.CLAIM_ROUTES[0], "a", Options({reader.__name__: value}), None)
     return match
-
-
-class _FakeFeatureSet:
-    """Just enough FeatureSet surface for load_neutral: sorted tuple of FeatureName, like the real one."""
-
-    def __init__(self, names: set[str], options: Options | None = None) -> None:
-        self._names = tuple(sorted(FeatureName(name) for name in names))
-        self.options = options  # FeatureSet leaves this None until a feature is added
-
-    def get_all_names(self) -> tuple[str, ...]:
-        return self._names
 
 
 @dataclass(frozen=True)
@@ -489,7 +478,7 @@ def test_unknown_feature_names_available_columns(
 ) -> None:
     monkeypatch.setattr(GovDataReader, "cache_dir", str(tmp_path))
     _mock_population_endpoints(fixtures_dir)
-    features = cast(FeatureSet, _FakeFeatureSet({"Einwohner_", "Stadtbezirk"}))
+    features = FeatureSet([Feature("Einwohner_"), Feature("Stadtbezirk")])
     with pytest.raises(ValueError) as excinfo:
         GovDataReader.load_neutral(_match(GovDataReader, SLUG), features)
     message = str(excinfo.value)
@@ -505,7 +494,7 @@ def test_unknown_feature_message_prints_plain_names(
     # FeatureSet names are FeatureName; the message must not leak the wrapper repr.
     monkeypatch.setattr(GovDataReader, "cache_dir", str(tmp_path))
     _mock_population_endpoints(fixtures_dir)
-    features = cast(FeatureSet, _FakeFeatureSet({"Nr", "Stadtbezirk"}))
+    features = FeatureSet([Feature("Nr"), Feature("Stadtbezirk")])
     with pytest.raises(ValueError) as excinfo:
         GovDataReader.load_neutral(_match(GovDataReader, SLUG), features)
     message = str(excinfo.value)
@@ -519,7 +508,7 @@ def test_unknown_feature_suggestion_only_for_close_matches(
 ) -> None:
     monkeypatch.setattr(GovDataReader, "cache_dir", str(tmp_path))
     _mock_population_endpoints(fixtures_dir)
-    features = cast(FeatureSet, _FakeFeatureSet({"Einwohner_", "zzzzz"}))
+    features = FeatureSet([Feature("Einwohner_"), Feature("zzzzz")])
     with pytest.raises(ValueError) as excinfo:
         GovDataReader.load_neutral(_match(GovDataReader, SLUG), features)
     message = str(excinfo.value)
@@ -559,7 +548,7 @@ def test_fake_reader_end_to_end_makes_no_http_calls(tmp_path: Path, monkeypatch:
 @respx.mock
 def test_unknown_feature_message_uses_locator_describe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(FakeReader, "cache_dir", str(tmp_path))
-    features = cast(FeatureSet, _FakeFeatureSet({"zz"}))
+    features = FeatureSet([Feature("zz")])
     with pytest.raises(ValueError) as excinfo:
         FakeReader.load_neutral(_match(FakeReader, "x"), features)
     message = str(excinfo.value)
