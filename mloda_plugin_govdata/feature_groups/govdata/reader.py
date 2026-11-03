@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, ClassVar, Generic, TypeVar, cast
 
 import pyarrow as pa
-from mloda.provider import ClaimRoute, FeatureSet, NamePolicy, SourceMatch, scrub_credentials
+from mloda.provider import ClaimRoute, FeatureSet, NamePolicy, SourceMatch, record_match_rejection, scrub_credentials
 from mloda.user import DataAccessCollection, DataType, Options
 from mloda.user.pyarrow import PyArrowTable  # noqa: F401
 
@@ -94,6 +94,10 @@ class BaseGovDataReader(GovDataFeature, Generic[LocatorT]):
         data_access_collection: DataAccessCollection | None,
     ) -> list[SourceMatch]:
         key = next((key for key in cls.pointer_keys() if key in options), None)
+        if key is not None and "in_features" in options:  # mloda's in_features: a derived group's name, never a column
+            reason = "carries in_features, so only a derived group computes it, and none matched; check its options"
+            record_match_rejection(cls.__name__, f"'{feature_name}' {reason}")
+            return []
         locator = None if key is None else cls._source_locator(options.get(key), feature_name, options)
         # The full selection is the source, so different years or query windows stay different sources.
         return [] if locator is None else [SourceMatch(source=repr(locator), access=locator)]

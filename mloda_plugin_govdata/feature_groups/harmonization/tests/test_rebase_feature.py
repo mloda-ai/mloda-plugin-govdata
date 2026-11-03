@@ -123,10 +123,9 @@ def test_children_carry_the_locator_and_leave_the_group_keys_behind() -> None:
     }
 
 
-def test_the_destatis_reader_leaves_chained_and_configured_names_to_the_derived_groups() -> None:
+def test_the_destatis_reader_leaves_chained_names_to_the_derived_groups() -> None:
     assert DestatisReader._source_locator("12411-0015", "value__rebased", Options({})) is None
     assert DestatisReader._source_locator("12411-0015", "kreise~edition", Options({})) is None
-    assert DestatisReader._source_locator("12411-0015", "kreise", Options(context={"in_features": "value"})) is None
     assert DestatisReader._source_locator("12411-0015", "value", Options({})) is not None
 
 
