@@ -11,7 +11,7 @@ import httpx
 import pytest
 import respx
 from mloda.provider import FeatureSet, SourceMatch
-from mloda.user import Credential, DataAccessCollection, Feature, FeatureName, Options, mloda
+from mloda.user import Credential, DataAccessCollection, Feature, Options, mloda
 
 from mloda_plugin_govdata.feature_groups.destatis.core.auth import OPTION_GENESIS_CREDENTIALS, DestatisCredentials
 from mloda_plugin_govdata.feature_groups.destatis.core.cache import ParameterCache
@@ -25,20 +25,6 @@ from mloda_plugin_govdata.feature_groups.govdata.reader import BaseGovDataReader
 FFCSV_FIXTURE = "21611-0002_de_flat.zip"
 TABLE_CODE = "21611-0002"
 TOKEN = "t0kenAbCdEf0123456789abcdef012345"
-
-
-class _FakeFeatureSet:
-    """Just enough FeatureSet surface for load_neutral; mirrors govdata/tests/test_reader.py."""
-
-    def __init__(self, names: set[str], options: Options | None = None) -> None:
-        self._names = tuple(sorted(FeatureName(name) for name in names))
-        self.options = options
-
-    def get_all_names(self) -> tuple[str, ...]:
-        return self._names
-
-    def get_sorted_features(self) -> tuple[Feature, ...]:
-        return ()
 
 
 def _mock_tablefile(zip_bytes: bytes) -> respx.Route:
@@ -358,7 +344,7 @@ def test_unknown_feature_names_available_columns(
     monkeypatch.setenv("GENESIS_TOKEN", TOKEN)
     zip_bytes = (fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes()
     _mock_tablefile(zip_bytes)
-    features = cast(FeatureSet, _FakeFeatureSet({"value", "not_a_column"}))
+    features = FeatureSet([Feature("value"), Feature("not_a_column")])
     with pytest.raises(ValueError) as excinfo:
         DestatisReader.load_neutral(_match(TABLE_CODE), features)
     message = str(excinfo.value)
