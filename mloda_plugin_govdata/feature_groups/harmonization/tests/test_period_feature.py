@@ -84,9 +84,9 @@ def test_genesis_labels_over_a_plain_csv_resolve_without_a_scope(
     monkeypatch.setattr(GovDataReader, "cache_dir", str(tmp_path))
     _mock_csv("Jahr;Stichtag\n2015;31.12.2015\n2016;2016-12-31\n")
     options = {GovDataReader.__name__: CSV_URL}
-    # The pre-0.17 workaround, a scope naming another group than the pointer, is refused.
-    with pytest.raises(ValueError, match="name different groups"):
-        _run([Feature("Jahr__year_period", options=options, feature_group=AnnualPeriodFeature)])
+    # A scope naming the derived group next to the pointer is accepted again (mloda 0.20, mloda-ai/mloda#2833).
+    scoped = _run([Feature("Jahr__year_period", options=options, feature_group=AnnualPeriodFeature)])[0]
+    assert scoped.column("Jahr__year_period").to_pylist() == [date(2015, 1, 1), date(2016, 1, 1)]
     features: list[Feature | str] = [
         Feature("Jahr__year_period", options=options),
         Feature("Stichtag__year_period", options=options),
