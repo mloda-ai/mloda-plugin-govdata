@@ -761,10 +761,10 @@ wheels = [
 
 [[package]]
 name = "mloda"
-version = "0.19.1"
+version = "0.20.0"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/46/87/341b2b63909f4fc2e4c0c03d1ebeb02eb743da09c33bd15ded4f14f60e71/mloda-0.19.1-py3-none-any.whl", hash = "sha256:65f156fa590aade822e43f4acfd154c84b0b2f8ca9546b705e23d4d226b6d7d5", size = 790815, upload-time = "2026-11-02T15:51:27.11Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/6b/ba3721a820c64ad42036d1cd6e92a06b00ec94c20a1dc89ae4392409f9dc/mloda-0.20.0-py3-none-any.whl", hash = "sha256:b742173735a4e54e85ef6e88e0cd40a555b23c62fe24792eb02a1be252155a2d", size = 973643, upload-time = "2026-11-13T15:38:33.493Z" },
 ]
 
 [[package]]
@@ -809,7 +809,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "hypothesis", marker = "extra == 'dev'" },
     { name = "marimo", marker = "extra == 'demo'", specifier = ">=0.14" },
-    { name = "mloda", specifier = ">=0.19.1,<0.20.0" },
+    { name = "mloda", specifier = ">=0.20.0,<0.21.0" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "openpyxl", specifier = ">=3.1" },
     { name = "packaging", marker = "extra == 'dev'", specifier = ">=24.2" },

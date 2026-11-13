@@ -20,6 +20,7 @@ from mloda.provider import (
     CHAIN_SEPARATOR,
     COLUMN_SEPARATOR,
     ClaimRoute,
+    CoreDeclineCode,
     FeatureSet,
     SourceMatch,
 )
@@ -81,7 +82,7 @@ class DestatisReader(BaseGovDataReader[DestatisLocator]):
             found = credentials_from_collection(data_access_collection, resolve_host(match.access.host))
         except (ValueError, GenesisAuthError) as exc:
             # Raises a marked abort, or declines with the reason inside mloda's global filter probe.
-            cls._abort(ValueError(str(exc)))
+            cls._abort(ValueError(str(exc)), code=CoreDeclineCode.CREDENTIALS_INVALID)
             return []
         return matches if found is None else [SourceMatch(match.source, _CollectionAccess(match.access, found))]
 
