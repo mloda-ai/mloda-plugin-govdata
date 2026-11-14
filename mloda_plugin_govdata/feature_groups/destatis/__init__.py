@@ -2,8 +2,8 @@
 
 GENESIS is the database software and its REST API. ``genesis`` (GENESIS-Online, Destatis) and ``regionalstatistik``
 (Regionaldatenbank, run by IT.NRW) are two installations of it, each with its own registration. By convention
-``Destatis*`` classes face mloda and ``Genesis*`` classes speak the protocol; ``OPTION_GENESIS_CREDENTIALS`` is an
-mloda option despite its name.
+``Destatis*`` classes face mloda and ``Genesis*`` classes speak the protocol. ``OPTION_GENESIS_CREDENTIALS`` names a
+retired option, refused at match time: credentials go in the run's ``DataAccessCollection``.
 """
 
 from .core.api import GenesisClient

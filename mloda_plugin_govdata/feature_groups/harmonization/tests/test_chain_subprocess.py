@@ -1,4 +1,4 @@
-"""A chained request with locator and credentials in its options resolves in a fresh interpreter."""
+"""A chained request with its locator in options and its token in the collection resolves in a fresh interpreter."""
 
 import os
 import subprocess
@@ -14,14 +14,13 @@ _SCRIPT = textwrap.dedent(
     import sys
     import httpx
     import respx
-    from mloda.user import Feature, Options, mloda
+    from mloda.user import Credential, DataAccessCollection, Feature, Options, mloda
 
     fixture_zip, keys_xlsx, cache_dir = sys.argv[1:4]
 
     # Only the documented surface: the harmonization package registers the derived groups, the
     # Destatis package the reader.
-    from mloda_plugin_govdata.feature_groups.destatis import DestatisCredentials, DestatisReader
-    from mloda_plugin_govdata.feature_groups.destatis.core.auth import OPTION_GENESIS_CREDENTIALS
+    from mloda_plugin_govdata.feature_groups.destatis import DestatisReader
     from mloda_plugin_govdata.feature_groups.destatis.core.hosts import GENESIS_ONLINE
     from mloda_plugin_govdata.feature_groups.harmonization import KreisRebaseFeature
     from mloda_plugin_govdata.feature_groups.harmonization.core.reference.bbsr import parse_bbsr_kreise_workbook
@@ -44,21 +43,24 @@ _SCRIPT = textwrap.dedent(
         "destatis__bevoelkerung__kreise",
         Options(
             group={DestatisReader.__name__: locator, "rebase_from_year": 2015, "rebase_to_year": 2016},
-            context={"in_features": "value", OPTION_GENESIS_CREDENTIALS: DestatisCredentials(token="sub-token")},
+            context={"in_features": "value"},
         ),
     )
+    collection = DataAccessCollection(credentials={"genesis": Credential(token="sub-token-0123456789")})
     with respx.mock:
-        respx.post(GENESIS_ONLINE.base_url + "data/tablefile").mock(
+        route = respx.post(GENESIS_ONLINE.base_url + "data/tablefile").mock(
             return_value=httpx.Response(200, content=zip_bytes, headers={"content-type": "application/octet-stream"})
         )
-        result = mloda.run_all([feature], compute_frameworks=["PyArrowTable"])
+        result = mloda.run_all([feature], compute_frameworks=["PyArrowTable"], data_access_collection=collection)
+    assert route.calls.last.request.headers["username"] == "sub-token-0123456789"
     table = result[0]
     values = table.column("destatis__bevoelkerung__kreise~value").to_pylist()
     assert values == [322616.0, 324013.0, 329538.0, 327065.0, 328036.0], values
     provenance = json.loads(table.column("destatis__bevoelkerung__kreise~provenance").to_pylist()[0])
     assert provenance["sheet"] == "2015-2016", provenance
-    steps = [step.feature_group_name for step in result.plan if step.step_kind == "compute"]
-    assert steps == ["DestatisReader", "KreisRebaseFeature"], steps
+    compute = [step for step in result.plan if step.step_kind == "compute"]
+    steps = [(step.feature_group_name, step.bound_credential_handle) for step in compute]
+    assert steps == [("DestatisReader", "genesis"), ("KreisRebaseFeature", None)], steps
     print("OK")
     """
 )
@@ -77,4 +79,4 @@ def test_chained_request_resolves_in_a_fresh_subprocess(
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert completed.stdout.strip() == "OK"
-    assert "sub-token" not in completed.stdout + completed.stderr
+    assert "sub-token-0123456789" not in completed.stdout + completed.stderr

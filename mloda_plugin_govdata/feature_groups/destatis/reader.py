@@ -4,13 +4,14 @@ Flow, on the shared ``BaseGovDataReader`` seam:
     _source_locator             pointer value -> DestatisLocator; declines chained and ``~part`` names
     find_sources                binds the run's DataAccessCollection credentials for the host to the match
     _fetch                      locator.tablefile_fields() -> ParameterCache hit, or a GenesisClient POST
-                                on a miss (credentials: Options.context, then the collection, then env)
+                                on a miss (credentials: the collection, then env)
     _parse                      zip on disk -> parse_ffcsv_zip -> typed Arrow table
 """
 
 from __future__ import annotations
 
 import functools
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar
@@ -21,7 +22,6 @@ from mloda.provider import (
     COLUMN_SEPARATOR,
     ClaimRoute,
     CoreDeclineCode,
-    FeatureSet,
     SourceMatch,
 )
 from mloda.user import DataAccessCollection, Options
@@ -30,7 +30,7 @@ from ..govdata.core.discovery import DL_DE_BY_2_0
 from ..govdata.core.provenance import FetchedPayload, Provenance
 from ..govdata.reader import BaseGovDataReader
 from .core.api import GenesisClient, fetch_tablefile
-from .core.auth import DestatisCredentials, credentials_from_collection, explicit_credentials_from_options
+from .core.auth import DestatisCredentials, credentials_from_collection, refuse_option_credentials
 from .core.cache import ParameterCache
 from .core.errors import GenesisAuthError
 from .core.hosts import resolve_host
@@ -44,6 +44,8 @@ class _CollectionAccess:
 
     locator: DestatisLocator
     credentials: DestatisCredentials = field(repr=False)
+    # The collection's stored entry: mloda names its handle in the plan and lock by identity.
+    entry: Mapping[str, object] = field(repr=False, compare=False)
 
     def describe(self) -> str:
         return self.locator.describe()
@@ -75,32 +77,29 @@ class DestatisReader(BaseGovDataReader[DestatisLocator]):
         data_access_collection: DataAccessCollection | None,
     ) -> list[SourceMatch]:
         matches = super().find_sources(route, feature_name, options, data_access_collection)
-        if not matches or explicit_credentials_from_options(options) is not None:
+        if not matches:
             return matches
         (match,) = matches
+        host = resolve_host(match.access.host)
+        # Each _abort raises a marked abort, or declines with the reason inside mloda's global filter probe.
         try:
-            found = credentials_from_collection(data_access_collection, resolve_host(match.access.host))
+            refuse_option_credentials(options, host)
+        except ValueError as exc:
+            cls._abort(exc, code=CoreDeclineCode.OPTION_VALUE_REJECTED)
+            return []
+        try:
+            found = credentials_from_collection(data_access_collection, host)
         except (ValueError, GenesisAuthError) as exc:
-            # Raises a marked abort, or declines with the reason inside mloda's global filter probe.
             cls._abort(ValueError(str(exc)), code=CoreDeclineCode.CREDENTIALS_INVALID)
             return []
-        return matches if found is None else [SourceMatch(match.source, _CollectionAccess(match.access, found))]
+        if found is None:
+            return matches
+        entry, credentials = found
+        return [SourceMatch(match.source, _CollectionAccess(match.access, credentials, entry))]
 
     @classmethod
-    def load_neutral(cls, match: SourceMatch, features: FeatureSet) -> Any:
-        # Context never splits a batch, and mloda hands over one feature's options, so explicit credentials are
-        # gathered from every feature; otherwise which one wins would depend on set order.
-        explicit = {
-            found
-            for feature in features.get_sorted_features()
-            if (found := explicit_credentials_from_options(feature.options)) is not None
-        }
-        if len(explicit) > 1:
-            raise ValueError("Features read together from one GENESIS selection carry different explicit credentials.")
-        if explicit:
-            locator = match.access.locator if isinstance(match.access, _CollectionAccess) else match.access
-            match = SourceMatch(match.source, _CollectionAccess(locator, explicit.pop()))
-        return super().load_neutral(match, features)
+    def match_credentials(cls, match: SourceMatch) -> Any | None:
+        return match.access.entry if isinstance(match.access, _CollectionAccess) else None
 
     @classmethod
     def _read_table(cls, locator: DestatisLocator | _CollectionAccess, options: Options | None = None) -> pa.Table:
@@ -119,10 +118,9 @@ class DestatisReader(BaseGovDataReader[DestatisLocator]):
     ) -> FetchedPayload:
         """POSTs (or reuses a cached reply for) the selection; credentials resolve lazily on a miss only."""
         host = resolve_host(locator.host)
-        explicit = explicit_credentials_from_options(options) or collection_credentials
         fields = locator.tablefile_fields()
         cache = ParameterCache(cls.cache_dir)
-        with GenesisClient(host, credentials=explicit, lock_dir=cls.cache_dir) as client:
+        with GenesisClient(host, credentials=collection_credentials, lock_dir=cls.cache_dir) as client:
             fetch = functools.partial(fetch_tablefile, client)
             cached = cache.get_or_fetch(host, "data/tablefile", fields, fetch)
         provenance = Provenance(
