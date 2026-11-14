@@ -35,12 +35,12 @@ class HarmonizationFeature(FeatureChainParserMixin, FeatureGroup):
     """Chained derived FeatureGroup over reader columns; the base matches nothing by itself.
 
     Children are explicit ``Feature`` objects: the consumer's reader locator forwards to them by
-    default, this group's own option keys are carved out, and the GENESIS credentials are pulled
-    from context, so a chained request resolves without the caller touching the reader features.
+    default and this group's own option keys are carved out, so a chained request resolves without
+    the caller touching the reader features.
     """
 
     cache_dir: ClassVar[str] = str(DEFAULT_CACHE_DIR)  # reference tables are read offline from here
-    # Context keys the children pull from the consumer; context never enters the feature hash.
+    # Context keys the children pull from the consumer: the retired credential key, so the reader refuses it.
     inherited_context_keys: ClassVar[frozenset[str]] = frozenset({OPTION_GENESIS_CREDENTIALS})
 
     @classmethod

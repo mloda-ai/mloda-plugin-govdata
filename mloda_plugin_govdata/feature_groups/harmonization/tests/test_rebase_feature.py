@@ -452,12 +452,10 @@ def test_options_reach_the_module(
 
 
 @respx.mock
-def test_explicit_credentials_travel_from_the_derived_feature_to_the_reader(
-    genesis: Callable[[str], respx.Route], extract_keys: None, monkeypatch: pytest.MonkeyPatch
+def test_the_retired_credential_option_travels_down_a_chain_and_is_refused(
+    genesis: Callable[[str], respx.Route], extract_keys: None, no_genesis_env: None
 ) -> None:
     route = genesis(GOETTINGEN_ZIP)
-    for var in ("GENESIS_TOKEN", "GENESIS_USER", "GENESIS_PASSWORD"):
-        monkeypatch.delenv(var, raising=False)
     feature = Feature(
         "value__rebased",
         Options(
@@ -465,9 +463,9 @@ def test_explicit_credentials_travel_from_the_derived_feature_to_the_reader(
             context={OPTION_GENESIS_CREDENTIALS: DestatisCredentials(token="explicit-token")},
         ),
     )
-    table = _run([feature])[0]
-    assert table.num_rows == 5
-    assert route.calls.call_count == 1
+    with pytest.raises(ValueError, match="under the handle 'genesis'") as excinfo:
+        _run([feature])
+    assert "explicit-token" not in str(excinfo.value) and route.calls.call_count == 0
 
 
 @respx.mock

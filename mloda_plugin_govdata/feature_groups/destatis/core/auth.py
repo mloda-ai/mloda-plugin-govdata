@@ -1,4 +1,4 @@
-"""Host-scoped GENESIS credentials: explicit option, then the run's DataAccessCollection, then env; redacted."""
+"""Host-scoped GENESIS credentials: the run's DataAccessCollection, then env; redacted."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from .hosts import GenesisHost
 # no *_PASSWORD named constant exists for bandit B105 to flag).
 ENV_SUFFIXES: tuple[str, str, str] = ("TOKEN", "USER", "PASSWORD")
 
-# Options.context key for explicit credentials; never a group key (group is hashed and printed).
+# Retired Options key: refused wherever it appears; credentials go in the run's DataAccessCollection.
 OPTION_GENESIS_CREDENTIALS = "genesis_credentials"
 
 _REDACTED = "<redacted>"
@@ -135,8 +135,8 @@ _CREDENTIAL_KEYS = frozenset({"host", "token", "user", "password"})
 
 def credentials_from_collection(
     collection: DataAccessCollection | None, host: GenesisHost
-) -> DestatisCredentials | None:
-    """The collection's GENESIS credentials for ``host``, or ``None``; errors name handles and keys, never values.
+) -> tuple[Mapping[str, object], DestatisCredentials] | None:
+    """The collection's stored entry for ``host`` and its parsed credentials, or ``None``; errors never name values.
 
     An entry counts only when tagged for GENESIS: its handle is a host name (``genesis``, ``regionalstatistik``)
     or it carries a known ``host`` key, so another plugin's token is never sent here.
@@ -145,7 +145,10 @@ def credentials_from_collection(
     matching = sorted(name for name, entry in entries.items() if _tag(entry.get("host", name)) == host.name)
     if len(matching) > 1:
         raise ValueError(f"Several credentials for host {host.name!r}: {', '.join(matching)}; keep one.")
-    return _destatis_credentials(matching[0], entries[matching[0]], host.name) if matching else None
+    if not matching:
+        return None
+    entry = entries[matching[0]]
+    return entry, _destatis_credentials(matching[0], entry, host.name)
 
 
 def _tag(value: object) -> str | None:
@@ -165,27 +168,10 @@ def _destatis_credentials(handle: str, entry: Mapping[str, object], host: str) -
         raise ValueError(f"Credentials {handle!r}: {exc}") from None
 
 
-def explicit_credentials_from_options(options: Options | None) -> DestatisCredentials | None:
-    """The explicit ``DestatisCredentials`` from ``Options.context``, or ``None``; never touches env or a host.
-
-    That lets a reader build a ``GenesisClient`` before knowing whether a request will actually happen
-    (a cache hit needs no credentials at all).
-    Only a ``DestatisCredentials`` instance is accepted: a plain mapping would sit unredacted in the
-    context, which ``str(options)`` prints verbatim.
-    """
-    if options is None:
-        return None
-    if OPTION_GENESIS_CREDENTIALS in options.group:
+def refuse_option_credentials(options: Options, host: GenesisHost) -> None:
+    """Raise when ``options`` carry the retired credential key, in group or context; never names its value."""
+    if OPTION_GENESIS_CREDENTIALS in options.group or OPTION_GENESIS_CREDENTIALS in options.context:
         raise ValueError(
-            f"{OPTION_GENESIS_CREDENTIALS!r} must be passed in Options.context, not group: "
-            "group options are hashed and printed with the feature."
+            f"Options key {OPTION_GENESIS_CREDENTIALS!r} is no longer read: register the credential in the run's "
+            f"DataAccessCollection under the handle {host.name!r}."
         )
-    raw = options.context.get(OPTION_GENESIS_CREDENTIALS)
-    if raw is None:
-        return None
-    if not isinstance(raw, DestatisCredentials):
-        raise TypeError(
-            f"{OPTION_GENESIS_CREDENTIALS!r} must be a DestatisCredentials instance (its repr is redacted), "
-            f"got {type(raw).__name__}"
-        )
-    return raw

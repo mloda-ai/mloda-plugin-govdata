@@ -1,6 +1,7 @@
 """DestatisReader: locator dispatch, peek without credentials, end-to-end via mloda.run_all."""
 
 import inspect
+import json
 import subprocess
 import sys
 import textwrap
@@ -11,6 +12,7 @@ import httpx
 import pytest
 import respx
 from mloda.provider import FeatureSet, SourceMatch
+from mloda.steward import write_plan_lock
 from mloda.user import Credential, DataAccessCollection, Feature, Options, mloda
 
 from mloda_plugin_govdata.feature_groups.destatis.core.auth import OPTION_GENESIS_CREDENTIALS, DestatisCredentials
@@ -186,27 +188,23 @@ def _env_token_only(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(DestatisReader, "cache_dir", str(tmp_path))
 
 
+def _bound_handles(result: Any) -> set[str | None]:
+    return {step.bound_credential_handle for step in result.plan if step.feature_group_name == "DestatisReader"}
+
+
 @respx.mock
-def test_explicit_credentials_from_options_are_used_over_env(
+def test_the_retired_credential_option_is_refused_before_any_request(
     fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _env_token_only(monkeypatch, tmp_path)
-    zip_bytes = (fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes()
-    route = _mock_tablefile(zip_bytes)
-    result = mloda.run_all(
-        [
-            Feature(
-                "value",
-                options=Options(
-                    group={DestatisReader.__name__: TABLE_CODE},
-                    context={OPTION_GENESIS_CREDENTIALS: DestatisCredentials(token=TOKEN)},
-                ),
-            )
-        ],
-        compute_frameworks=["PyArrowTable"],
+    route = _mock_tablefile((fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes())
+    options = Options(
+        group={DestatisReader.__name__: TABLE_CODE},
+        context={OPTION_GENESIS_CREDENTIALS: DestatisCredentials(token=TOKEN)},
     )
-    assert result[0].num_rows == 207
-    assert route.calls.last.request.headers["username"] == TOKEN
+    with pytest.raises(ValueError, match="under the handle 'genesis'") as excinfo:
+        mloda.run_all([Feature("value", options=options)], compute_frameworks=["PyArrowTable"])
+    assert TOKEN not in str(excinfo.value) and route.calls.call_count == 0
 
 
 @respx.mock
@@ -215,55 +213,13 @@ def test_another_plugins_token_is_never_sent_to_genesis(
 ) -> None:
     _env_token_only(monkeypatch, tmp_path)
     route = _mock_tablefile((fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes())
-    mloda.run_all(
+    result = mloda.run_all(
         [Feature("value", options={DestatisReader.__name__: TABLE_CODE})],
         compute_frameworks=["PyArrowTable"],
         data_access_collection=DataAccessCollection(credentials={"hf": Credential(token=TOKEN)}),
     )
     assert route.calls.last.request.headers["username"] == ENV_TOKEN
-
-
-@respx.mock
-def test_explicit_credentials_win_over_the_collection_in_one_request(
-    fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _env_token_only(monkeypatch, tmp_path)
-    route = _mock_tablefile((fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes())
-    explicit = Feature(
-        "value",
-        options=Options(
-            group={DestatisReader.__name__: TABLE_CODE},
-            context={OPTION_GENESIS_CREDENTIALS: DestatisCredentials(token=TOKEN)},
-        ),
-    )
-    plain = Feature("time", options={DestatisReader.__name__: TABLE_CODE})
-    mloda.run_all(
-        [plain, explicit],
-        compute_frameworks=["PyArrowTable"],
-        data_access_collection=DataAccessCollection(credentials={"genesis": Credential(token="collectionToken0123")}),
-    )
-    assert {call.request.headers["username"] for call in route.calls} == {TOKEN}
-
-
-@respx.mock
-def test_different_explicit_credentials_in_one_batch_are_refused(
-    fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _env_token_only(monkeypatch, tmp_path)
-    route = _mock_tablefile((fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes())
-    features: list[Feature | str] = [
-        Feature(
-            name,
-            options=Options(
-                group={DestatisReader.__name__: TABLE_CODE},
-                context={OPTION_GENESIS_CREDENTIALS: DestatisCredentials(token=token)},
-            ),
-        )
-        for name, token in (("value", TOKEN), ("time", ENV_TOKEN))
-    ]
-    with pytest.raises(ValueError, match="carry different explicit credentials"):
-        mloda.run_all(features, compute_frameworks=["PyArrowTable"])
-    assert route.calls.call_count == 0
+    assert _bound_handles(result) == {None}  # env credentials bind no handle
 
 
 @respx.mock
@@ -276,6 +232,7 @@ def test_describe_columns_uses_the_collection_credentials(
     options = Options({DestatisReader.__name__: TABLE_CODE})
     [match] = DestatisReader.find_sources(DestatisReader.CLAIM_ROUTES[0], "value", options, collection)
     assert TOKEN not in repr(match) and DestatisReader.data_access_identity(match) == TABLE_CODE
+    assert DestatisReader.match_credentials(match) is collection.credentials["genesis"]
     assert "value" in DestatisReader.describe_columns(match)
     assert route.calls.last.request.headers["username"] == TOKEN
 
@@ -297,17 +254,6 @@ def test_an_ambiguous_collection_is_refused_at_match_time_without_a_request(
             data_access_collection=collection,
         )
     assert TOKEN not in str(excinfo.value) and route.calls.call_count == 0
-    # An explicit per-feature override never consults the collection, so the ambiguity cannot block it.
-    explicit = Options(
-        group={DestatisReader.__name__: TABLE_CODE},
-        context={OPTION_GENESIS_CREDENTIALS: DestatisCredentials(token=TOKEN)},
-    )
-    mloda.run_all(
-        [Feature("value", options=explicit)],
-        compute_frameworks=["PyArrowTable"],
-        data_access_collection=collection,
-    )
-    assert route.calls.last.request.headers["username"] == TOKEN
 
 
 @respx.mock
@@ -324,16 +270,24 @@ def test_collection_credentials_follow_the_host(
         credentials={"genesis": Credential(token=TOKEN), "regionalstatistik": Credential(token="regionalToken0123")}
     )
     regional_table = DestatisLocator("13211-02-05-4", host="regionalstatistik")
-    mloda.run_all(
+    result = mloda.run_all(
         [
             Feature("value", options={DestatisReader.__name__: regional_table}),
             Feature("time", options={DestatisReader.__name__: TABLE_CODE}),
+            Feature("value", options={DestatisReader.__name__: TABLE_CODE}),
         ],
         compute_frameworks=["PyArrowTable"],
         data_access_collection=collection,
     )
     assert regional.calls.last.request.headers["username"] == "regionalToken0123"
     assert online.calls.last.request.headers["username"] == TOKEN
+    assert online.calls.call_count == 1  # two columns of one selection, one request
+    # The bound handle reaches the plan and the plan lock, never the value.
+    assert _bound_handles(result) == {"genesis", "regionalstatistik"}
+    write_plan_lock(result.plan, tmp_path / "lock.json")
+    text = (tmp_path / "lock.json").read_text(encoding="utf-8")
+    handles = [handle for step in json.loads(text)["compute"] for handle in step.get("credential_handles", [])]
+    assert sorted(handles) == ["genesis", "regionalstatistik"] and TOKEN not in text
 
 
 @respx.mock

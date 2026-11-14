@@ -10,7 +10,7 @@ from mloda_plugin_govdata.feature_groups.destatis.core.auth import (
     OPTION_GENESIS_CREDENTIALS,
     DestatisCredentials,
     credentials_from_collection,
-    explicit_credentials_from_options,
+    refuse_option_credentials,
     resolve_credentials,
 )
 from mloda_plugin_govdata.feature_groups.destatis.core.errors import MissingCredentialsError, WrongHostCredentialsError
@@ -46,31 +46,18 @@ def test_repr_and_str_redact() -> None:
     assert credentials.secrets() == (TOKEN, USER, PASSWORD)
 
 
-def test_options_context_never_prints_the_secret() -> None:
-    credentials = DestatisCredentials(token=TOKEN)
-    options = Options(group={"DestatisReader": "12411-0015"}, context={OPTION_GENESIS_CREDENTIALS: credentials})
-    assert TOKEN not in str(options) and TOKEN not in repr(options)
-    assert explicit_credentials_from_options(options) is credentials
-    # The context does not feed the hash: two features with different credentials batch together.
-    other = Options(
-        group={"DestatisReader": "12411-0015"}, context={OPTION_GENESIS_CREDENTIALS: DestatisCredentials(token="x")}
-    )
-    assert hash(options) == hash(other)
-
-
-def test_options_group_is_refused() -> None:
-    options = Options(group={OPTION_GENESIS_CREDENTIALS: DestatisCredentials(token=TOKEN)})
-    with pytest.raises(ValueError, match="context"):
-        explicit_credentials_from_options(options)
-
-
-def test_options_context_refuses_anything_but_the_redacting_instance() -> None:
-    # Only the redacting instance: a plain mapping's masking would depend on mloda's key-name heuristics.
-    options = Options(context={OPTION_GENESIS_CREDENTIALS: {"token": TOKEN}})
-    with pytest.raises(TypeError, match="DestatisCredentials instance"):
-        explicit_credentials_from_options(options)
-    with pytest.raises(TypeError):
-        explicit_credentials_from_options(Options(context={OPTION_GENESIS_CREDENTIALS: 42}))
+@pytest.mark.parametrize(
+    "options",
+    [
+        Options(context={OPTION_GENESIS_CREDENTIALS: DestatisCredentials(token=TOKEN)}),
+        Options(context={OPTION_GENESIS_CREDENTIALS: {"token": TOKEN}}),
+        Options(group={OPTION_GENESIS_CREDENTIALS: TOKEN}),
+    ],
+)
+def test_the_retired_option_key_is_refused_without_its_value(options: Options) -> None:
+    with pytest.raises(ValueError, match="DataAccessCollection under the handle 'regionalstatistik'") as excinfo:
+        refuse_option_credentials(options, REGIONALSTATISTIK)
+    assert TOKEN not in str(excinfo.value)
 
 
 def test_control_characters_and_non_latin1_are_refused_without_echo() -> None:
@@ -124,17 +111,10 @@ def test_env_whitespace_is_normalized() -> None:
     assert credentials.headers()["username"] == TOKEN
 
 
-def test_explicit_credentials_from_options_is_none_without_a_context_entry() -> None:
-    assert explicit_credentials_from_options(None) is None
-    assert explicit_credentials_from_options(Options({"DestatisReader": "12411-0015"})) is None
-
-
-def test_explicit_credentials_from_options_never_touches_env_or_a_host() -> None:
-    # A cache-hit caller (peek) must be able to build this before deciding whether a request
-    # happens at all, so this never resolves from the environment and takes no host argument.
-    credentials = DestatisCredentials(token=TOKEN)
-    options = Options(context={OPTION_GENESIS_CREDENTIALS: credentials})
-    assert explicit_credentials_from_options(options) is credentials
+def test_options_without_the_retired_key_pass() -> None:
+    refuse_option_credentials(
+        Options({"DestatisReader": "12411-0015"}, context={"in_features": "value"}), GENESIS_ONLINE
+    )
 
 
 def test_unknown_host_with_explicit_prefix() -> None:
@@ -157,8 +137,11 @@ def test_a_host_key_tags_an_entry_and_a_database_login_is_never_taken() -> None:
         nrw={"host": " Regionalstatistik ", "user": USER, "password": PASSWORD},
         db={"host": "db.example.org", "user": USER, "password": PASSWORD},
     )
-    regional = credentials_from_collection(collection, REGIONALSTATISTIK)
-    assert regional is not None and (regional.host, regional.user) == ("regionalstatistik", USER)
+    found = credentials_from_collection(collection, REGIONALSTATISTIK)
+    assert found is not None
+    entry, regional = found
+    assert entry is collection.credentials["nrw"]  # the stored object: mloda finds its handle by identity
+    assert (regional.host, regional.user) == ("regionalstatistik", USER)
     assert credentials_from_collection(collection, GENESIS_ONLINE) is None
     assert credentials_from_collection(None, GENESIS_ONLINE) is None
 

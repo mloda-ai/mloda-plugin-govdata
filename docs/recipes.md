@@ -97,7 +97,9 @@ policy as the reference tables in the harmonization package. The shipped files a
 of each step that the documented call (`compute_frameworks=["PyArrowTable"]`) resolves to, plus a hash of the
 code each reader can reach. The offline tests fail with a diff when a plan changes, a mloda upgrade or an edit
 to reader code included. Regenerate the recipes and locks with
-`uv run python scripts/write_recipes.py` and review the lock diff before committing.
+`uv run python scripts/write_recipes.py` and review the lock diff before committing. The locks are written without a
+`DataAccessCollection` (env credentials); a run with collection credentials adds the bound handle to its plan, so
+its lock differs by that handle.
 
 ## Shipped recipes
 
