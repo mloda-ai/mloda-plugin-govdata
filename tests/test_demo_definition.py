@@ -12,7 +12,6 @@ import marimo
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEMO_PATH = REPO_ROOT / "demos" / "govdata_demo.py"
 RECIPES_DIR = REPO_ROOT / "recipes"
 NOTEBOOK_PATHS = sorted(
     path
@@ -35,8 +34,7 @@ GUARDED_PATHS = [path for path in NOTEBOOK_PATHS if GUARD_CALL in path.read_text
 def test_globs_find_all_notebooks_and_docs() -> None:
     # A silently empty glob must fail, not skip the parametrized tests.
     expected = {
-        DEMO_PATH,
-        DEMO_PATH.with_name("berlin_wahl_2026_demo.py"),
+        REPO_ROOT / "demos" / "berlin_wahl_2026_demo.py",
         REPO_ROOT / "tutorials" / "01_first_table.py",
         REPO_ROOT / "tutorials" / "02_elections_and_air_quality.py",
         REPO_ROOT / "tutorials" / "03_destatis_table.py",
@@ -45,7 +43,7 @@ def test_globs_find_all_notebooks_and_docs() -> None:
     }
     assert expected <= set(NOTEBOOK_PATHS)
     guarded = ("03_destatis_table.py", "04_todays_borders.py", "05_recipes_and_provenance.py")
-    assert {DEMO_PATH, *(REPO_ROOT / "tutorials" / name for name in guarded)} <= set(GUARDED_PATHS)
+    assert {REPO_ROOT / "tutorials" / name for name in guarded} <= set(GUARDED_PATHS)
     assert {REPO_ROOT / "README.md", REPO_ROOT / "docs" / "schnellstart.md"} <= set(DOC_PATHS)
 
 
@@ -83,7 +81,7 @@ def test_every_mloda_name_it_imports_exists(path: Path) -> None:
     assert missing == []
 
 
-def _demo_tree(path: Path = DEMO_PATH) -> ast.Module:
+def _demo_tree(path: Path) -> ast.Module:
     return ast.parse(path.read_text(encoding="utf-8"))
 
 
@@ -112,7 +110,7 @@ def _recipe_files_the_notebooks_load() -> set[str]:
 
 def test_every_recipe_file_a_notebook_loads_is_shipped() -> None:
     names = _recipe_files_the_notebooks_load()
-    assert names, "the recipe chapters load recipe files"
+    assert names, "the tutorials load recipe files"
     assert [name for name in sorted(names) if not (RECIPES_DIR / name).is_file()] == []
 
 
@@ -162,7 +160,7 @@ def test_every_cell_after_the_credentials_guard_depends_on_it(path: Path) -> Non
     assert unguarded == []
 
 
-# The demo is left out: its cells before the guard read live sources.
+# Demos are left out: their cells before the guard may read live sources.
 @pytest.mark.parametrize(
     "path",
     [path for path in GUARDED_PATHS if path.parent.name == "tutorials"],

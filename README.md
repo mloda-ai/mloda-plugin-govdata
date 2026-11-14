@@ -85,7 +85,7 @@ Tutorials, about 15 minutes each:
 4. [Districts on today's borders](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/04_todays_borders.py): re-base a district's population series across a merger, read how each value came about, add EU region codes (NUTS). Same account as tutorial 3. `uv run marimo edit tutorials/04_todays_borders.py`
 5. [Recipes and provenance](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/05_recipes_and_provenance.py): run a recipe file, join population and eligible voters for all 16 Länder, read where every number came from and under which license. Same account as tutorial 3. `uv run marimo edit tutorials/05_recipes_and_provenance.py`
 
-Demos: `uv run marimo edit demos/govdata_demo.py` walks through every source, the Göttingen series, and a join of population and eligible voters for all 16 Länder; its Destatis chapters skip themselves without GENESIS credentials. `demos/berlin_wahl_2026_demo.py` reads four Berlin elections with one set of reader options.
+Demo: `uv run marimo edit demos/berlin_wahl_2026_demo.py` reads four Berlin elections with one set of reader options.
 
 ## Docs
 
