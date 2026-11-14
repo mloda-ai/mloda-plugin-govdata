@@ -50,7 +50,7 @@ demo = ["marimo>=0.14", "altair>=5"]
 dev = [
     "tox",
     "tox-uv",
-    "uv>=0.11.15",
+    "uv>=0.13.4",
     "pytest",
     # Exact pin: tox resolves the dev extra without uv.lock, so a range lets tox and .venv lint differently.
     "ruff==0.17.0",
