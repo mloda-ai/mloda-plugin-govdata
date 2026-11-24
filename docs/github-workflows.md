@@ -1,6 +1,6 @@
 # GitHub Workflows
 
-This project uses four GitHub Actions workflows to automate testing, security scanning, template synchronization, and releases.
+This project uses five GitHub Actions workflows to automate testing, security scanning, template synchronization, releases, and publishing to PyPI.
 
 ## Test Workflow
 
@@ -56,15 +56,28 @@ git merge template/main
 **Triggers:**
 - Manual dispatch only
 
-**Purpose:** Automates semantic versioning and publishing. The workflow:
+**Purpose:** Automates semantic versioning and publishing to TestPyPI. The workflow:
 1. Analyzes commits using [semantic-release](https://semantic-release.gitbook.io/) to determine the next version
 2. Creates a GitHub release with changelog
 3. Updates version in `pyproject.toml`
-4. Builds and publishes the package to PyPI
+4. Builds the wheel once from the released commit
+5. Publishes that wheel to [TestPyPI](https://test.pypi.org/project/mloda-plugin-govdata/) (job `publish_testpypi`, environment `testpypi`)
+6. Attaches the same wheel to the GitHub release
 
 **Requirements:**
 - `SEMANTIC_RELEASE_TOKEN` - GitHub Personal Access Token with `repo` write permissions
-- `PYPI_API_TOKEN` - PyPI API token for package publishing
+- A TestPyPI Trusted Publisher (see [Trusted Publishing](#trusted-publishing)); no PyPI token is stored
+
+## Publish to PyPI Workflow
+
+**File:** `.github/workflows/publish-pypi.yaml`
+
+**Triggers:**
+- Manual dispatch only, with the released `version` (for example `0.5.1`) as input
+
+**Purpose:** Downloads the wheel the Release workflow attached to the GitHub release and publishes it to [PyPI](https://pypi.org/project/mloda-plugin-govdata/) (job `publish_pypi`, environment `pypi`). PyPI gets byte for byte the file TestPyPI got, so check the TestPyPI release first.
+
+**Requirements:** A PyPI Trusted Publisher (see [Trusted Publishing](#trusted-publishing)).
 
 **Prerequisites:** Commits must follow the [Conventional Commits](https://www.conventionalcommits.org/) format for semantic-release to determine version bumps:
 - `fix:` - Patch release (0.0.x)
@@ -88,15 +101,14 @@ To configure the required secrets for the release workflow:
 9. Value: Paste the token
 10. Click **Add secret**
 
-### PYPI_API_TOKEN
+## Trusted Publishing
 
-1. Log in to [PyPI](https://pypi.org/)
-2. Go to **Account settings** > **API tokens**
-3. Click **Add API token**
-4. Give it a descriptive name and scope it to your project (recommended) or all projects
-5. Click **Create token** and copy the token
-6. In your repository, go to **Settings** > **Secrets and variables** > **Actions**
-7. Click **New repository secret**
-8. Name: `PYPI_API_TOKEN`
-9. Value: Paste the token (starts with `pypi-`)
-10. Click **Add secret**
+Uploads use [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/): the job's OIDC token is traded for a short-lived upload token, so no PyPI secret is stored. Set it up once per index:
+
+| Index | Workflow | Environment |
+|-------|----------|-------------|
+| [test.pypi.org](https://test.pypi.org/manage/project/mloda-plugin-govdata/settings/publishing/) | `release.yaml` | `testpypi` |
+| [pypi.org](https://pypi.org/manage/project/mloda-plugin-govdata/settings/publishing/) | `publish-pypi.yaml` | `pypi` |
+
+1. On each index, open the project's **Publishing** settings and add a GitHub publisher with owner `mloda-ai`, repository `mloda-plugin-govdata`, and the workflow and environment from the table. A project that does not exist on the index yet takes a pending publisher from the account's **Publishing** page.
+2. In the repository, go to **Settings** > **Environments** and create `testpypi` and `pypi`. Restricting `pypi` to the `main` branch or adding required reviewers is optional.

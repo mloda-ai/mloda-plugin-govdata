@@ -875,10 +875,12 @@ dev = [
     { name = "packaging" },
     { name = "pandas-stubs" },
     { name = "pytest" },
+    { name = "pyyaml" },
     { name = "respx" },
     { name = "ruff" },
     { name = "tox" },
     { name = "tox-uv" },
+    { name = "types-pyyaml" },
     { name = "uv" },
 ]
 
@@ -899,11 +901,13 @@ requires-dist = [
     { name = "pyarrow", specifier = ">=17.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'" },
+    { name = "pyyaml", marker = "extra == 'dev'" },
     { name = "respx", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.17.0" },
     { name = "tenacity", specifier = ">=9.2.1" },
     { name = "tox", marker = "extra == 'dev'" },
     { name = "tox-uv", marker = "extra == 'dev'" },
+    { name = "types-pyyaml", marker = "extra == 'dev'" },
     { name = "uv", marker = "extra == 'dev'", specifier = ">=0.13.4" },
 ]
 provides-extras = ["demo", "dev"]
@@ -2092,6 +2096,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/78/9f/cc5a6323ce97973dade2ce6c1e31c943cec5652bf46edda5429785b44c5c/tox_uv_bare-1.37.7.tar.gz", hash = "sha256:2453b801163e8b0e128aa73c6057aa1eb635d0919166b2b7b2e93a62006bbd6e", size = 39291, upload-time = "2026-11-07T08:14:29.197Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fe/a0/ca490d5e13ada234821c690bdd97c0ffa776d30b3d67b5786bcbb8add542/tox_uv_bare-1.37.7-py3-none-any.whl", hash = "sha256:82eb929961a8d193b05332a717c906a6c95ca21689800cbae0fe3b337cb8dfd1", size = 24542, upload-time = "2026-11-07T08:14:27.83Z" },
+]
+
+[[package]]
+name = "types-pyyaml"
+version = "6.0.12.20261113"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4d/8b/ba599d956693dbc98e170f32097128bdea0a17f9d42b0b490fa749c12b1a/types_pyyaml-6.0.12.20261113.tar.gz", hash = "sha256:0828be2580fd94151182364f4d0158e4de62fdbeeb8d4296f7f7d2b6c22bb640", size = 19017, upload-time = "2026-11-13T08:51:21.488Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fd/2e/36fc0941a40ef066dbc8abac41bbbefb41389f547c779aef832aea6b873d/types_pyyaml-6.0.12.20261113-py3-none-any.whl", hash = "sha256:3600749e613748afdc4327f0b17c3296cf880cdbc7335f320007abd9dd815f67", size = 21321, upload-time = "2026-11-13T08:51:20.417Z" },
 ]
 
 [[package]]
