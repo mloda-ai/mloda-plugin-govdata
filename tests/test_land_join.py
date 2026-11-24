@@ -10,7 +10,7 @@ import pytest
 import respx
 from mloda.provider import FeatureGroup, FeatureSet
 from mloda.steward import Extender, ExtenderHook, HookContext
-from mloda.user import Feature, FeatureName, Options, PluginCollector, mloda
+from mloda.user import Credential, DataAccessCollection, Feature, FeatureName, Options, PluginCollector, mloda
 
 from mloda_plugin_govdata.feature_groups.destatis import DestatisReader, parse_ffcsv_zip
 from mloda_plugin_govdata.feature_groups.destatis.core.hosts import GENESIS_ONLINE
@@ -29,12 +29,12 @@ LAND_TABLE_ZIP = FEATURE_GROUPS / "destatis" / "tests" / "fixtures" / "ffcsv" / 
 KERG_SAMPLE = FEATURE_GROUPS / "govdata" / "tests" / "fixtures" / "kerg_sample.csv"
 LAND_CODES = {f"{n:02d}" for n in range(1, 17)}
 TOKEN = "test-token"
+COLLECTION = DataAccessCollection(credentials={"genesis": Credential(token=TOKEN)})
 
 
 def _mock_both_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(DestatisReader, "cache_dir", str(tmp_path))
     monkeypatch.setattr(BundeswahlleiterinReader, "cache_dir", str(tmp_path))
-    monkeypatch.setenv("GENESIS_TOKEN", TOKEN)
     respx.post(GENESIS_ONLINE.base_url + "data/tablefile").mock(
         return_value=httpx.Response(
             200, content=LAND_TABLE_ZIP.read_bytes(), headers={"content-type": "application/octet-stream"}
@@ -87,6 +87,7 @@ def test_land_join_through_mloda(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         plugin_collector=PluginCollector.enabled_feature_groups(
             {DestatisReader, BundeswahlleiterinReader, LandPopulationPerVoter}
         ),
+        data_access_collection=COLLECTION,
     )
 
     table = result[0]
@@ -131,6 +132,7 @@ def test_each_source_keeps_its_own_name_for_extenders(tmp_path: Path, monkeypatc
             {DestatisReader, BundeswahlleiterinReader, LandPopulationPerVoter}
         ),
         function_extender={recorder},
+        data_access_collection=COLLECTION,
     )
 
     # mloda's default would name both loads by their locator type alone.
@@ -151,6 +153,7 @@ def test_a_raw_column_next_to_the_land_ratio_keeps_its_rows(tmp_path: Path, monk
         plugin_collector=PluginCollector.enabled_feature_groups(
             {DestatisReader, BundeswahlleiterinReader, LandPopulationPerVoter}
         ),
+        data_access_collection=COLLECTION,
     )
     rows = {frozenset(table.schema.names): table.num_rows for table in result}
     assert rows == {frozenset({"value"}): 16, frozenset(f"{LandPopulationPerVoter.NAME}~{part}" for part in PARTS): 16}

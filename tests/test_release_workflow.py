@@ -18,6 +18,8 @@ EXPECTED_PERMISSIONS = {
 }
 # Must match the environment each Trusted Publisher is limited to on (Test)PyPI.
 EXPECTED_ENVIRONMENTS = {"publish_testpypi": "testpypi", "publish_pypi": "pypi"}
+# The GitHub Pages deploy needs an OIDC token too. No Trusted Publisher names its workflow or environment.
+PAGES_DEPLOY = ("tutorials-live.yml", "publish")
 
 
 def _workflow_paths() -> list[Path]:
@@ -69,8 +71,12 @@ def test_only_expected_jobs_publish_with_oidc_only() -> None:
             assert publish["with"]["repository-url"] == "https://test.pypi.org/legacy/"
         else:
             assert "repository-url" not in publish.get("with", {}), f"{key} must publish to real PyPI"
+    pages = jobs[PAGES_DEPLOY]
+    assert pages.get("permissions") == {"pages": "write", "id-token": "write"}, f"{PAGES_DEPLOY} permissions"
+    assert pages.get("environment", {}).get("name") == "github-pages", f"{PAGES_DEPLOY} environment"
+    assert [_uses(s).split("@")[0] for s in pages["steps"]] == ["actions/deploy-pages"], f"{PAGES_DEPLOY} steps"
     for key, job in jobs.items():
-        if key not in publishers:
+        if key not in publishers | {PAGES_DEPLOY}:
             assert "id-token" not in (job.get("permissions") or {}), f"{key} must not grant id-token"
     for path in _workflow_paths():
         assert "id-token" not in (_workflow(path.name).get("permissions") or {}), f"{path.name} top-level"

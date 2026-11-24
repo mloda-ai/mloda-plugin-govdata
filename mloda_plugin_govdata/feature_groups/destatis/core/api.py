@@ -30,7 +30,7 @@ from .envelope import (
     LoginCheckReply,
     inspect_response,
 )
-from .errors import GenesisBackendError, GenesisError, GenesisUnknownEnvelope, MissingCredentialsError
+from .errors import GenesisBackendError, GenesisError, GenesisUnknownEnvelope
 from .hosts import GENESIS_ONLINE, GenesisHost, resolve_host
 from .redact import redact_text
 
@@ -115,7 +115,7 @@ def _process_lock(host: GenesisHost) -> threading.Lock:
 
 
 class GenesisClient(OwnedHttpClient):
-    """Calls one GENESIS host. Credentials resolve lazily (explicit, then env) on the first call that needs them."""
+    """Calls one GENESIS host with the credentials passed in; it never reads the environment."""
 
     def __init__(
         self,
@@ -125,15 +125,13 @@ class GenesisClient(OwnedHttpClient):
         client: httpx.Client | None = None,
         language: str = DEFAULT_LANGUAGE,
         lock_dir: str | os.PathLike[str] | None = None,
-        environ: Mapping[str, str] | None = None,
         allow_guest: bool = False,
     ) -> None:
         self.host = resolve_host(host)
         self.language = language
         self._explicit = credentials
         self._credentials: DestatisCredentials | None = None
-        self._environ = environ
-        # Guest calls send no credential headers; only for characterizing replies (the capture script).
+        # No credentials: send no headers instead of raising; for characterizing replies only (capture script).
         self.allow_guest = allow_guest
         self._owns_client = client is None
         # Redirects are also disabled per request, so an injected client cannot re-enable them.
@@ -143,19 +141,14 @@ class GenesisClient(OwnedHttpClient):
 
     @property
     def credentials(self) -> DestatisCredentials:
-        """Resolved credentials for this host; raises MissingCredentialsError when none are configured."""
+        """Credentials for this host; raises MissingCredentialsError when none were passed."""
         if self._credentials is None:
-            self._credentials = resolve_credentials(self.host, self._explicit, self._environ)
+            self._credentials = resolve_credentials(self.host, self._explicit)
         return self._credentials
 
     def _auth_headers(self) -> dict[str, str]:
         if self.allow_guest and self._explicit is None:
-            try:
-                configured = DestatisCredentials.from_env(self.host, self._environ)
-            except MissingCredentialsError:
-                configured = None  # a half-set env pair still runs as guest here
-            if configured is None:
-                return {}
+            return {}
         return self.credentials.headers()
 
     @contextmanager

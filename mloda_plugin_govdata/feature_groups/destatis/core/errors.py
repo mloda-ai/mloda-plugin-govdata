@@ -27,7 +27,7 @@ class GenesisAuthError(GenesisError):
 
 
 class MissingCredentialsError(GenesisAuthError):
-    """No credentials found for the host; the message names the env vars and the registration URL."""
+    """No credentials for the host; the message names the collection handle and the registration URL."""
 
 
 class WrongHostCredentialsError(GenesisAuthError):

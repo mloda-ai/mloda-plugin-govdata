@@ -30,11 +30,13 @@ gv-isys-2016-extract.xlsx
 Source: Destatis Gemeindeverzeichnis-Informationssystem (GV-ISys), Namens-Grenz-Aenderung
 2016.xlsx, sheet "Gebietsaenderungen 2016": header block plus change 03/2016/0006-R, the two
 Kreis-level rows (03152 Goettingen and 03156 Osterode am Harz merging into 03159 Goettingen,
-01.11.2016) and the Gemeinde row for the Gemeindefreies Gebiet Harz (03156501 -> 03159501).
+01.11.2016) and the Gemeinde row for the Gemeindefreies Gebiet Harz (03156501 -> 03159501), then
+the two rows of the Quedlinburg rename (change type 4, legal 21.01.2015, statistical 01.11.2016): the
+Gemeinde row (15085235) and the Gemeindeverband row (RS 150850235, no AGS).
 Original: https://www.destatis.de/DE/Themen/Laender-Regionen/Regionales/Gemeindeverzeichnis/Namens-Grenz-Aenderung/2016.xlsx?__blob=publicationFile&v=5
 Original sha256: 301a0b72381d78ece5b3fe811fd29e7739258da55ebda9dacb1a0d2651f2b0b7 (fetched
 2026-08-17, matches the 2026-08-16 pin)
-Extract sha256: 5c5d86929fc01d7799264a749ad7a9fcbb0cb23600b48504581c47520ff14ec2
+Extract sha256: e9a614b9091fa3358ec6263fb5c9454f5d8b75efab7994d359bf8f9d8c8d6f74
 License: Datenlizenz Deutschland - Namensnennung - Version 2.0 (dl-de/by-2-0), per Destatis'
 site-wide open-data policy (https://www.destatis.de/DE/Service/OpenData/_inhalt.html: "Die
 statistischen Daten koennen unter den Bedingungen der Datenlizenz Deutschland 2.0
@@ -74,8 +76,12 @@ Original: https://ec.europa.eu/eurostat/documents/345175/501971/EU-27-LAU-2025-N
 Fetched: 2026-08-17
 Original sha256: 983e75ed4ec38b716f9e3839a99cdc9a3e72e55c6473e24084ff13afee4e65e5
 Re-published 2026-09-28 at the same URL, sha256 9fd84ca59e36c2d494ccf0d7009f14feaa304a3943877c7d6533f736265aaf73
-(the current pin, set 2026-10-21): the DE sheet unchanged cell for cell, compared against the Wayback Machine capture of
+(pinned 2026-10-21): the DE sheet unchanged cell for cell, compared against the Wayback Machine capture of
 2026-08-13, whose body matches the original sha256; only the EL, CY, RO, NO and CH sheets differ.
+Re-published again at the same URL between 2026-11-16 and 2026-11-24, sha256
+5cfb4dc995746a4b5b8a60994e91e9bdc82bfdf68769c05b171d475d16a9c799 (the current pin, set 2026-11-24): the DE sheet
+unchanged cell for cell against the 2026-09-28 file; an ME sheet was added, and the File_info, Overview,
+Overview_Population, BE, LV and FI sheets differ.
 Extract sha256: f2e0734283885f364e30f787b4e5fd78f42090218f50f297efdea505b8227576
 License: Creative Commons Attribution 4.0 International (CC BY 4.0), same Eurostat copyright
 notice as above. Attribution: Source: Eurostat.

@@ -11,14 +11,14 @@ import pyarrow as pa
 import pytest
 import respx
 from mloda.provider import FeatureChainParser, FeatureSet
-from mloda.user import Feature, FeatureName, Options, mloda
+from mloda.user import Feature, FeatureName, FeatureResolutionError, Options, mloda
 
 from mloda_plugin_govdata.feature_groups.destatis.reader import DestatisReader
 from mloda_plugin_govdata.feature_groups.govdata.population import StuttgartPopulationReader
 from mloda_plugin_govdata.feature_groups.govdata.reader import GovDataReader
 from mloda_plugin_govdata.feature_groups.harmonization.period import AnnualPeriodFeature
 
-from .conftest import GOETTINGEN_LOCATOR, GOETTINGEN_ZIP
+from .conftest import GOETTINGEN_LOCATOR, GOETTINGEN_ZIP, genesis_collection
 
 PACKAGE_SHOW = "https://ckan.govdata.de/api/3/action/package_show"
 CSV_URL = "https://example.org/jahre.csv"
@@ -26,7 +26,7 @@ SLUG = "einwohner-nach-altersgruppen-und-stadtbezirken"
 
 
 def _run(features: list[Feature | str]) -> Any:
-    return mloda.run_all(features, compute_frameworks=["PyArrowTable"])
+    return mloda.run_all(features, compute_frameworks=["PyArrowTable"], data_access_collection=genesis_collection())
 
 
 def test_matches_the_year_period_name_and_the_configuration_based_form() -> None:
@@ -37,6 +37,9 @@ def test_matches_the_year_period_name_and_the_configuration_based_form() -> None
     )
     assert not AnnualPeriodFeature.match_feature_group_criteria(
         "period", Options(group={"period_freq": "quarter"}, context={"in_features": "time"})
+    )
+    assert not AnnualPeriodFeature.match_feature_group_criteria(  # the name is its source column
+        "time", Options(group={"period_freq": "year"}, context={"in_features": "time"})
     )
     (child,) = AnnualPeriodFeature().input_features(Options({}), FeatureName("time__year_period")) or set()
     assert str(child.name) == "time"
@@ -94,6 +97,21 @@ def test_genesis_labels_over_a_plain_csv_resolve_without_a_scope(
     table = _run(features)[0]
     assert table.column("Jahr__year_period").to_pylist() == [date(2015, 1, 1), date(2016, 1, 1)]
     assert table.column("Stichtag__year_period").to_pylist() == [date(2015, 1, 1), date(2016, 1, 1)]
+    explicit = {**options, "period_freq": "year"}  # other group options, so another call over the same rows
+    with pytest.raises(ValueError, match="'Jahr__year_period' is requested more than once .*period_freq='year'"):
+        _run([Feature("Jahr__year_period", options=options), Feature("Jahr__year_period", options=explicit)])
+
+
+@respx.mock
+def test_a_configured_name_equal_to_its_source_column_is_refused_before_the_fetch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(GovDataReader, "cache_dir", str(tmp_path))
+    _mock_csv("Jahr;x\n2015;a\n")
+    options = Options(group={GovDataReader.__name__: CSV_URL, "period_freq": "year"}, context={"in_features": "Jahr"})
+    with pytest.raises(FeatureResolutionError, match=r"AnnualPeriodFeature \(feature name\): 'Jahr' equals its source"):
+        _run([Feature("Jahr", options)])
+    assert respx.calls.call_count == 0
 
 
 @respx.mock

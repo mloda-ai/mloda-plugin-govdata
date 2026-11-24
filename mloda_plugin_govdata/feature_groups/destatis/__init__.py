@@ -8,7 +8,6 @@ retired option, refused at match time: credentials go in the run's ``DataAccessC
 
 from .core.api import GenesisClient
 from .core.auth import OPTION_GENESIS_CREDENTIALS, DestatisCredentials
-from .core.cache import ParameterCache
 from .core.errors import (
     GenesisAuthError,
     GenesisBackendError,
@@ -46,7 +45,6 @@ __all__ = [
     "GenesisUnknownEnvelope",
     "GenesisUnknownTable",
     "MissingCredentialsError",
-    "ParameterCache",
     "WrongHostCredentialsError",
     "parse_ffcsv_zip",
 ]

@@ -28,12 +28,16 @@ Der Feature-Name ist die gewünschte Spalte, die Option wählt Reader und Datens
 Registrieren Sie sich bei [GENESIS-Online](https://genesis.destatis.de/datenbank/online/) und setzen Sie den Token, den die Weboberfläche unter „Webservice-Schnittstelle (API)“ zeigt, als Umgebungsvariable `GENESIS_TOKEN` ([Details auf Englisch](credentials.md)).
 
 ```python
-from mloda.user import Feature, mloda
+import os
+
+from mloda.user import Credential, DataAccessCollection, Feature, mloda
 from mloda_plugin_govdata.feature_groups.destatis import DestatisReader
 
+genesis = DataAccessCollection(credentials={"genesis": Credential(token=os.environ["GENESIS_TOKEN"])})
 result = mloda.run_all(
     [Feature("value", options={DestatisReader: "12411-0010"})],  # Bevölkerung nach Ländern
     compute_frameworks=["PyArrowTable"],
+    data_access_collection=genesis,
 )
 ```
 
@@ -58,15 +62,16 @@ cd mloda-plugin-govdata
 uv sync --all-extras
 ```
 
-Tutorials (englisch), je etwa 15 Minuten:
+Tutorials (englisch), je etwa 15 Minuten. Online lesen, mit Ergebnissen und ohne Installation: [mloda-ai.github.io/mloda-plugin-govdata](https://mloda-ai.github.io/mloda-plugin-govdata/).
 
 1. [Your first table](../tutorials/01_first_table.py): einen GovData-Datensatz finden, seine Spalten ansehen, ihn einlesen. Ohne Konto. `uv run marimo edit tutorials/01_first_table.py`
 2. [Elections and air quality](../tutorials/02_elections_and_air_quality.py): die Ergebnisse der Bundestagswahl 2025 und stündliche Ozonwerte einlesen, jeden Reader über Optionen steuern. Ohne Konto. `uv run marimo edit tutorials/02_elections_and_air_quality.py`
 3. [A table from Destatis](../tutorials/03_destatis_table.py): die Bevölkerung nach Ländern aus GENESIS-Online lesen, Jahre und Merkmale wählen, die Zeichen anstelle von Zahlen richtig lesen. Kostenloses GENESIS-Online-Konto, Token in `.env`. `uv run marimo edit tutorials/03_destatis_table.py`
 4. [Districts on today's borders](../tutorials/04_todays_borders.py): die Bevölkerungsreihe eines Kreises über eine Fusion hinweg auf den heutigen Gebietsstand bringen, ablesen, wie jeder Wert entstand, EU-Regionalcodes (NUTS) ergänzen. Dasselbe Konto wie in Tutorial 3. `uv run marimo edit tutorials/04_todays_borders.py`
 5. [Recipes and provenance](../tutorials/05_recipes_and_provenance.py): eine Rezeptdatei ausführen, Bevölkerung und Wahlberechtigte für alle 16 Länder verknüpfen, ablesen, woher jede Zahl stammt und unter welcher Lizenz. Dasselbe Konto wie in Tutorial 3. `uv run marimo edit tutorials/05_recipes_and_provenance.py`
+6. [A new election](../tutorials/06_a_new_election.py): vier Berliner Wahlen mit denselben Reader-Optionen lesen, die nächste Wahl als weitere URL ergänzen, die Wahlbeteiligung trotz eigener Briefwahlbezirke richtig berechnen. Ohne Konto. `uv run marimo edit tutorials/06_a_new_election.py`
 
-Demo: `uv run marimo edit demos/berlin_wahl_2026_demo.py` liest vier Berliner Wahlen mit denselben Reader-Optionen.
+Demo: `uv run marimo edit demos/berlin_wahl_2026_demo.py` führt die Berliner Wahlen weiter: Parteinamen, die Bevölkerung jedes Wahlbezirks, eine Wahlnacht im Zeitraffer.
 
 ## Weiterlesen (englisch)
 

@@ -51,7 +51,7 @@ def _instant_backoff(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _client(tmp_path: Path, credentials: DestatisCredentials | None = None, **kwargs: object) -> GenesisClient:
-    return GenesisClient(GENESIS_ONLINE, credentials, lock_dir=tmp_path, environ={}, **kwargs)  # type: ignore[arg-type]
+    return GenesisClient(GENESIS_ONLINE, credentials, lock_dir=tmp_path, **kwargs)  # type: ignore[arg-type]
 
 
 def _form(request: httpx.Request) -> dict[str, list[str]]:
@@ -142,10 +142,11 @@ def test_unknown_operation_and_field_are_refused_before_the_wire(tmp_path: Path)
         assert _form(route.calls.last.request) == {"name": ["12411-0015"], "format": ["ffcsv"], "language": ["de"]}
 
 
-def test_missing_credentials_raise_before_any_request(tmp_path: Path) -> None:
+def test_missing_credentials_raise_before_any_request(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GENESIS_TOKEN", TOKEN)  # the client never reads the environment
     with respx.mock(assert_all_called=False) as router:
         route = router.post(BASE + "helloworld/logincheck").mock(return_value=httpx.Response(200, json=OK_LOGIN))
-        with _client(tmp_path) as client, pytest.raises(MissingCredentialsError, match="GENESIS_TOKEN"):
+        with _client(tmp_path) as client, pytest.raises(MissingCredentialsError, match="handle 'genesis'"):
             client.logincheck()
         assert route.call_count == 0
 
@@ -155,12 +156,6 @@ def test_credentials_of_one_host_never_reach_the_other(tmp_path: Path) -> None:
         route = router.post(REGIONALSTATISTIK.base_url + "helloworld/logincheck").mock(
             return_value=httpx.Response(200, json=OK_LOGIN)
         )
-        env_only_genesis = {"GENESIS_TOKEN": TOKEN}
-        with (
-            GenesisClient(REGIONALSTATISTIK, lock_dir=tmp_path, environ=env_only_genesis) as client,
-            pytest.raises(MissingCredentialsError, match="REGIONALSTATISTIK_TOKEN"),
-        ):
-            client.logincheck()
         with (
             GenesisClient(
                 REGIONALSTATISTIK, DestatisCredentials(host="genesis", token=TOKEN), lock_dir=tmp_path
@@ -169,10 +164,9 @@ def test_credentials_of_one_host_never_reach_the_other(tmp_path: Path) -> None:
         ):
             client.logincheck()
         assert route.call_count == 0
-        # By name works too, and the env prefix follows the host.
-        with GenesisClient(
-            "regionalstatistik", lock_dir=tmp_path, environ={"REGIONALSTATISTIK_TOKEN": TOKEN}
-        ) as client:
+        # By name works too.
+        regional = DestatisCredentials(host="regionalstatistik", token=TOKEN)
+        with GenesisClient("regionalstatistik", regional, lock_dir=tmp_path) as client:
             client.logincheck()
         assert route.calls.last.request.headers["username"] == TOKEN
 
@@ -220,18 +214,13 @@ def test_guest_mode_sends_no_headers_only_when_allowed(tmp_path: Path) -> None:
     with _client(tmp_path, allow_guest=True) as client, pytest.raises(GenesisAuthError):
         client.logincheck()
     assert "username" not in route.calls.last.request.headers
-    # A half-set env pair still runs as guest instead of aborting.
-    half = GenesisClient(GENESIS_ONLINE, lock_dir=tmp_path, environ={"GENESIS_USER": USER}, allow_guest=True)
-    with half, pytest.raises(GenesisAuthError):
-        half.logincheck()
-    assert "username" not in route.calls.last.request.headers
-    # A token alongside a half-set pair still runs as guest too.
-    half_with_token = GenesisClient(
-        GENESIS_ONLINE, lock_dir=tmp_path, environ={"GENESIS_TOKEN": TOKEN, "GENESIS_USER": USER}, allow_guest=True
-    )
-    with half_with_token, pytest.raises(GenesisAuthError):
-        half_with_token.logincheck()
-    assert "username" not in route.calls.last.request.headers
+    # Explicit credentials are sent even when guest mode is allowed.
+    with (
+        _client(tmp_path, DestatisCredentials(token=TOKEN), allow_guest=True) as client,
+        pytest.raises(GenesisAuthError),
+    ):
+        client.logincheck()
+    assert route.calls.last.request.headers["username"] == TOKEN
 
 
 @respx.mock

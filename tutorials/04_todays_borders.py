@@ -44,29 +44,26 @@ def _():
     import altair as alt
     import pandas as pd
 
-    from mloda.user import Feature, mloda
+    from mloda.user import DataAccessCollection, Feature, mloda
     from mloda_plugin_govdata.feature_groups.destatis import (
         GENESIS_ONLINE,
         DestatisCredentials,
         DestatisLocator,
         DestatisReader,
         MissingCredentialsError,
-        ParameterCache,
     )
-    from mloda_plugin_govdata.feature_groups.govdata import DownloadCache
     from mloda_plugin_govdata.feature_groups.harmonization import AgsToNutsFeature, KreisRebaseFeature
 
     return (
         AgsToNutsFeature,
+        DataAccessCollection,
         DestatisCredentials,
         DestatisLocator,
         DestatisReader,
-        DownloadCache,
         Feature,
         GENESIS_ONLINE,
         KreisRebaseFeature,
         MissingCredentialsError,
-        ParameterCache,
         alt,
         json,
         mloda,
@@ -75,12 +72,16 @@ def _():
 
 
 @app.cell
-def _(DestatisCredentials, DestatisLocator, GENESIS_ONLINE, MissingCredentialsError, mo):
+def _(DataAccessCollection, DestatisCredentials, DestatisLocator, GENESIS_ONLINE, MissingCredentialsError, mo):
     # Every later cell takes a name from this cell, so mo.stop holds them all back.
     _why = None
+    _collection = None
     try:
-        if DestatisCredentials.from_env(GENESIS_ONLINE) is None:
+        _credentials = DestatisCredentials.from_env(GENESIS_ONLINE)
+        if _credentials is None:
             _why = "No token found: `GENESIS_TOKEN` is not set (nor `GENESIS_USER` and `GENESIS_PASSWORD`)."
+        else:
+            _collection = DataAccessCollection(credentials={"genesis": _credentials.to_credential()})
     except MissingCredentialsError:  # a user name without a password, or the reverse
         _why = "Set both `GENESIS_USER` and `GENESIS_PASSWORD`, or only `GENESIS_TOKEN`."
     except ValueError:  # a character that cannot be part of a token, e.g. a copied quote mark
@@ -89,11 +90,12 @@ def _(DestatisCredentials, DestatisLocator, GENESIS_ONLINE, MissingCredentialsEr
         _why is not None,
         mo.md(f"**Stopped.** {_why} See *Get a token* in tutorial 3, then start marimo again."),
     )
+    collection = _collection
     TABLE = "12411-0015"
     goettingen = DestatisLocator(
         TABLE, regionalvariable="KREISE", regionalkey=["03152", "03156", "03159"], startyear=2011
     )
-    return TABLE, goettingen
+    return TABLE, collection, goettingen
 
 
 @app.cell
@@ -110,12 +112,13 @@ def _(mo):
 
 
 @app.cell
-def _(DestatisReader, Feature, goettingen, mloda):
+def _(DestatisReader, Feature, collection, goettingen, mloda):
     _columns = ["time", "1_variable_attribute_code", "1_variable_attribute_label", "value", "value_marker"]
     _result = mloda.run_all(
         [Feature(_name, options={DestatisReader: goettingen}) for _name in _columns],
         compute_frameworks=["PyArrowTable"],
         column_ordering="request_order",
+        data_access_collection=collection,
     )
     raw = _result[0].to_pandas()
     raw.pivot(index="time", columns="1_variable_attribute_label", values="value")  # one column per district
@@ -160,10 +163,14 @@ def _(mo):
 
 
 @app.cell
-def _(DestatisReader, Feature, KreisRebaseFeature, goettingen, mloda):
+def _(DestatisReader, Feature, KreisRebaseFeature, collection, goettingen, mloda):
     KreisRebaseFeature.fetch_reference()
     rebase_options = {DestatisReader: goettingen, "rebase_from_year": 2015, "rebase_to_year": 2016}
-    _result = mloda.run_all([Feature("value__rebased", options=rebase_options)], compute_frameworks=["PyArrowTable"])
+    _result = mloda.run_all(
+        [Feature("value__rebased", options=rebase_options)],
+        compute_frameworks=["PyArrowTable"],
+        data_access_collection=collection,
+    )
     rebased = _result[0].to_pandas().sort_values("value__rebased~year", ignore_index=True)
     rebased[[f"value__rebased~{_part}" for _part in ("key", "year", "value", "flag", "sources")]]
     return rebase_options, rebased
@@ -207,10 +214,12 @@ def _(mo):
 
 
 @app.cell
-def _(AgsToNutsFeature, Feature, mloda, rebase_options):
+def _(AgsToNutsFeature, Feature, collection, mloda, rebase_options):
     AgsToNutsFeature.fetch_reference()
     _name = "value__rebased~key__nuts2024"
-    _result = mloda.run_all([Feature(_name, options=rebase_options)], compute_frameworks=["PyArrowTable"])
+    _result = mloda.run_all(
+        [Feature(_name, options=rebase_options)], compute_frameworks=["PyArrowTable"], data_access_collection=collection
+    )
     nuts = _result[0].to_pandas()
     nuts[[f"{_name}~{_part}" for _part in ("key", "nuts1", "nuts2", "nuts3", "version")]].drop_duplicates()
     return (nuts,)
@@ -291,7 +300,7 @@ def _(DestatisLocator, TABLE, goettingen, mo):
 
 
 @app.cell
-def _(DestatisReader, Feature, alt, merger, mloda, pd, rebased):
+def _(DestatisReader, Feature, alt, collection, merger, mloda, pd, rebased):
     _after_step_2 = rebased  # Step 2 fetched the key file this cell needs
     _locator, _from_year = merger.value
     _options = {DestatisReader: _locator}
@@ -300,10 +309,13 @@ def _(DestatisReader, Feature, alt, merger, mloda, pd, rebased):
         [Feature(_name, options=_options) for _name in _columns],
         compute_frameworks=["PyArrowTable"],
         column_ordering="request_order",
+        data_access_collection=collection,
     )[0].to_pandas()
     _years = {"rebase_from_year": _from_year, "rebase_to_year": _from_year + 1}
     _rebased = mloda.run_all(
-        [Feature("value__rebased", options={**_options, **_years})], compute_frameworks=["PyArrowTable"]
+        [Feature("value__rebased", options={**_options, **_years})],
+        compute_frameworks=["PyArrowTable"],
+        data_access_collection=collection,
     )[0].to_pandas()
     # Formatting only: one long table, one line per series.
     _lines = pd.concat(
@@ -339,43 +351,28 @@ def _(mo):
 
 
 @app.cell
-def _(
-    AgsToNutsFeature,
-    DestatisReader,
-    DownloadCache,
-    GENESIS_ONLINE,
-    KreisRebaseFeature,
-    ParameterCache,
-    TABLE,
-    goettingen,
-    json,
-    mo,
-    nuts,
-    rebased,
-):
-    _hit = ParameterCache(DestatisReader.cache_dir).lookup(
-        GENESIS_ONLINE, "data/tablefile", goettingen.tablefile_fields()
-    )
-    _keys = json.loads(rebased["value__rebased~provenance"].iloc[0])  # the key file Step 2 used
+def _(AgsToNutsFeature, DestatisReader, KreisRebaseFeature, TABLE, goettingen, json, mo, nuts, rebased):
+    def _retrieved(record):
+        # A missing record or date means the cache was cleared since the step ran.
+        return (
+            f"{record.retrieved_at:%Y-%m-%d}" if record and record.retrieved_at else "not in the local cache any more"
+        )
+
+    _sheet = json.loads(rebased["value__rebased~provenance"].iloc[0])["sheet"]  # the key sheet Step 2 used
     _version = nuts["value__rebased~key__nuts2024~version"].iloc[0]
-    _crosswalk = AgsToNutsFeature.load_crosswalk()  # the table Step 3 used; reading it takes a few seconds
-    with DownloadCache(KreisRebaseFeature.cache_dir) as _cache:
-        _keys_retrieved = _cache.get_or_download(_keys["url"], revalidate=False).retrieved_at
-    with DownloadCache(AgsToNutsFeature.cache_dir) as _cache:
-        _crosswalk_retrieved = _cache.get_or_download(_crosswalk.url, revalidate=False).retrieved_at
-    _table_retrieved = f"{_hit.retrieved_at:%Y-%m-%d}" if _hit else "not in the local cache any more"
+    (_keys,) = KreisRebaseFeature.reference_sources()
+    _codes, _changes = AgsToNutsFeature.reference_sources()  # the NUTS table and the 2016 change file
     mo.md(f"""
     - **Population:** Statistisches Bundesamt (Destatis), GENESIS-Online, table {TABLE},
-      https://genesis.destatis.de/datenbank/online/statistic/12411/table/{TABLE}, retrieved {_table_retrieved}.
-      License `{DestatisReader.LICENSE}`.
-    - **Conversion keys:** {_keys["source"]}, sheet {_keys["sheet"]}, {_keys["url"]}, retrieved
-      {_keys_retrieved:%Y-%m-%d}. Attribution: "Laufende Raumbeobachtung des BBSR". License `DL-DE-BY-2.0`.
-    - **NUTS {_version} codes:** {_crosswalk.source}, {_crosswalk.url}, retrieved
-      {_crosswalk_retrieved:%Y-%m-%d}. Attribution: "Source: Eurostat." License `CC-BY-4.0`.
+      https://genesis.destatis.de/datenbank/online/statistic/12411/table/{TABLE}, retrieved
+      {_retrieved(DestatisReader.retrieval(goettingen))}. License `{DestatisReader.LICENSE}`.
+    - **Conversion keys:** {_keys.source.name}, sheet {_sheet}, {_keys.source.url}, retrieved
+      {_retrieved(_keys)}. Attribution: "{_keys.source.attribution}". License `{_keys.source.license}`.
+    - **NUTS {_version} codes:** {_codes.source.name}, {_codes.source.url}, retrieved {_retrieved(_codes)}.
+      Attribution: "{_codes.source.attribution}". License `{_codes.source.license}`.
     - **Border changes of 2016:** Destatis municipality register (*Gemeindeverzeichnis*), change file 2016,
-      https://www.destatis.de/DE/Themen/Laender-Regionen/Regionales/Gemeindeverzeichnis/_inhalt.html,
-      fetched together with the NUTS codes. Attribution: "(c) Statistisches Bundesamt (Destatis)". License
-      `DL-DE-BY-2.0`.
+      {_changes.source.url}, retrieved {_retrieved(_changes)}. Attribution: "{_changes.source.attribution}".
+      License `{_changes.source.license}`.
     """)
     return
 

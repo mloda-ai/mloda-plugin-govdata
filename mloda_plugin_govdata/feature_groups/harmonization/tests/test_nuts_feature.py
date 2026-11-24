@@ -14,6 +14,13 @@ from mloda_plugin_govdata.feature_groups.destatis.reader import DestatisReader
 from mloda_plugin_govdata.feature_groups.govdata.core.cache import CacheMissError
 from mloda_plugin_govdata.feature_groups.harmonization.core.crosswalk import NutsCrosswalk
 from mloda_plugin_govdata.feature_groups.harmonization.core.nuts import UnmatchedKeysError
+from mloda_plugin_govdata.feature_groups.harmonization.core.reference.sources import (
+    EUROSTAT_LAU_NUTS,
+    GV_ISYS_2016_SHA256,
+    ReferenceCopy,
+    ReferenceSource,
+    gv_isys_source,
+)
 from mloda_plugin_govdata.feature_groups.harmonization.nuts import NULL_KEY, AgsToNutsFeature
 
 from .conftest import (
@@ -22,6 +29,7 @@ from .conftest import (
     LAND_ZIP,
     ffcsv_zip_with_rows,
     fixture_crosswalk,
+    genesis_collection,
     gv_isys_changes,
     lau_rows,
 )
@@ -32,7 +40,7 @@ PARTS = AgsToNutsFeature.OUTPUT_PARTS
 
 
 def _run(features: list[Feature | str]) -> Any:
-    return mloda.run_all(features, compute_frameworks=["PyArrowTable"])
+    return mloda.run_all(features, compute_frameworks=["PyArrowTable"], data_access_collection=genesis_collection())
 
 
 def test_matches_only_the_pinned_nuts_version() -> None:
@@ -48,6 +56,9 @@ def test_matches_only_the_pinned_nuts_version() -> None:
         "kreis_nuts", Options(group={"nuts_version": "2021"}, context={"in_features": KEY})
     )
     assert not AgsToNutsFeature.match_feature_group_criteria("kreis_nuts", Options(context={"in_features": KEY}))
+    assert not AgsToNutsFeature.match_feature_group_criteria(  # the name is its source column
+        KEY, Options(group={"nuts_version": "2024"}, context={"in_features": KEY})
+    )
 
 
 def test_the_named_capture_binds_nuts_version_by_name() -> None:
@@ -157,12 +168,18 @@ def test_a_cached_crosswalk_of_another_nuts_version_is_refused(
         _run([Feature(NAME, options={DestatisReader.__name__: GOETTINGEN_LOCATOR})])
 
 
-def test_a_crosswalk_missing_from_the_cache_names_the_fetch_call(
+@respx.mock
+def test_an_empty_reference_cache_names_the_fetch_call_and_lists_the_sources(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(AgsToNutsFeature, "cache_dir", str(tmp_path))
     with pytest.raises(CacheMissError, match="AgsToNutsFeature.fetch_reference\\(\\).*AgsToNutsFeature.cache_dir"):
         AgsToNutsFeature.load_crosswalk()
+    codes, changes = AgsToNutsFeature.reference_sources()
+    assert codes == ReferenceCopy(EUROSTAT_LAU_NUTS, None, None)
+    assert (changes.source.sha256, changes.sha256, changes.retrieved_at) == (GV_ISYS_2016_SHA256, None, None)
+    assert "2016" in changes.source.url
+    assert respx.calls.call_count == 0
 
 
 def test_fetch_reference_fetches_only_the_file_missing_from_the_cache(
@@ -170,20 +187,22 @@ def test_fetch_reference_fetches_only_the_file_missing_from_the_cache(
 ) -> None:
     calls: list[tuple[str, bool]] = []
 
-    def changes(year: int, cache: Any, *, revalidate: bool = False) -> list[Any]:
-        calls.append((f"gv-isys {year}", revalidate))
-        return []
-
-    def crosswalk(cache: Any, *, gv_isys_changes: Any = (), revalidate: bool = False) -> Any:
-        calls.append(("crosswalk", revalidate))
-        if not revalidate:
+    def fetch(cache: Any, source: ReferenceSource, *, revalidate: bool = False) -> Path:
+        calls.append((source.url, revalidate))
+        if source == EUROSTAT_LAU_NUTS and not revalidate:
             raise CacheMissError("miss")
+        return tmp_path / "unused"
 
-    monkeypatch.setattr("mloda_plugin_govdata.feature_groups.harmonization.nuts.load_gv_isys_changes", changes)
-    monkeypatch.setattr("mloda_plugin_govdata.feature_groups.harmonization.nuts.load_nuts_crosswalk", crosswalk)
+    def parse(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("fetch_reference parsed a file")
+
+    monkeypatch.setattr("mloda_plugin_govdata.feature_groups.harmonization.base.fetch_pinned", fetch)
+    monkeypatch.setattr("mloda_plugin_govdata.feature_groups.harmonization.nuts.load_gv_isys_changes", parse)
+    monkeypatch.setattr("mloda_plugin_govdata.feature_groups.harmonization.nuts.load_nuts_crosswalk", parse)
     monkeypatch.setattr(AgsToNutsFeature, "cache_dir", str(tmp_path))
     AgsToNutsFeature.fetch_reference()
-    assert calls == [("gv-isys 2016", False), ("crosswalk", False), ("crosswalk", True)]
+    codes = EUROSTAT_LAU_NUTS.url
+    assert calls == [(codes, False), (codes, True), (gv_isys_source(2016).url, False)]
 
 
 @respx.mock
@@ -195,6 +214,10 @@ def test_two_parts_of_one_output_in_one_request(
     table = _run([Feature(f"{NAME}~nuts1", options=options), Feature(f"{NAME}~nuts3", options=options)])[0]
     assert sorted(table.schema.names) == [f"{NAME}~nuts1", f"{NAME}~nuts3"]
     assert table.num_rows == 15
+    # Other options for the same name are refused.
+    flagged = {**options, "nuts_on_unmatched": "flag"}
+    with pytest.raises(ValueError, match=f"AgsToNutsFeature: '{NAME}' is requested more than once in this run"):
+        _run([Feature(NAME, options=options), Feature(f"{NAME}~unmatched", options=flagged)])
 
 
 @respx.mock

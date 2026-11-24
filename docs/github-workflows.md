@@ -1,6 +1,6 @@
 # GitHub Workflows
 
-This project uses five GitHub Actions workflows to automate testing, security scanning, template synchronization, releases, and publishing to PyPI.
+This project uses GitHub Actions workflows to automate testing, security scanning, template synchronization, live tutorial runs with the tutorial web pages, releases, and publishing to PyPI.
 
 ## Test Workflow
 
@@ -48,6 +48,21 @@ git remote add template https://github.com/mloda-ai/mloda-plugin-template.git
 git fetch template
 git merge template/main
 ```
+
+## Tutorials (live) Workflow
+
+**File:** `.github/workflows/tutorials-live.yml`
+
+**Triggers:**
+- Manual dispatch only, with an optional `publish` tick box
+
+**Purpose:** Runs every tutorial against the live sources. With `publish`, it then builds one web page per tutorial plus an index (`scripts/build_site.py`) and deploys them to GitHub Pages. A cell that fails or stops, or a credential in a page, fails the run and publishes nothing.
+
+**To publish:** **Actions** > **Tutorials (live)** > **Run workflow**, on the default branch, with `publish` ticked. The pages appear at `https://<owner>.github.io/mloda-plugin-govdata/`. From another branch the pages are not deployed: they stay an artifact of the run for one day, to look at first.
+
+**Requirements:**
+- `GENESIS_TOKEN` - a GENESIS-Online token, as a repository secret (on a fork: the fork's own secret)
+- For `publish`: **Settings** > **Pages** > **Source** set to **GitHub Actions**; this creates the `github-pages` environment the deploy uses
 
 ## Release Workflow
 

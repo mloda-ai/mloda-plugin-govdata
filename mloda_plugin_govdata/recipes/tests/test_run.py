@@ -21,7 +21,7 @@ _RUN_SCRIPT = textwrap.dedent(
     import sys
     import httpx
     import respx
-    from mloda.user import mloda
+    from mloda.user import Credential, DataAccessCollection, mloda
 
     # The only plugin import before loading: the loader must register the feature groups itself.
     from mloda_plugin_govdata.recipes import load_recipe
@@ -39,7 +39,12 @@ _RUN_SCRIPT = textwrap.dedent(
         respx.post(GENESIS_ONLINE.base_url + "data/tablefile").mock(
             return_value=httpx.Response(200, content=zip_bytes, headers={"content-type": "application/octet-stream"})
         )
-        result = mloda.run_all(recipe.features, compute_frameworks=["PyArrowTable"], links=set(recipe.links))
+        result = mloda.run_all(
+            recipe.features,
+            compute_frameworks=["PyArrowTable"],
+            links=set(recipe.links),
+            data_access_collection=DataAccessCollection(credentials={"genesis": Credential(token="test-token")}),
+        )
     table = result[0]
     assert table.num_rows == 16, table.num_rows
     assert sorted(table.column_names) == ["1_variable_attribute_code", "value"], table.column_names
@@ -53,7 +58,7 @@ _REBASE_SCRIPT = textwrap.dedent(
     import sys
     import httpx
     import respx
-    from mloda.user import mloda
+    from mloda.user import Credential, DataAccessCollection, mloda
 
     # Loading the recipe registers the harmonization groups; nothing else is imported first.
     from mloda_plugin_govdata.recipes import load_recipe
@@ -76,7 +81,11 @@ _REBASE_SCRIPT = textwrap.dedent(
         respx.post(GENESIS_ONLINE.base_url + "data/tablefile").mock(
             return_value=httpx.Response(200, content=zip_bytes, headers={"content-type": "application/octet-stream"})
         )
-        result = mloda.run_all(recipe.features, compute_frameworks=["PyArrowTable"])
+        result = mloda.run_all(
+            recipe.features,
+            compute_frameworks=["PyArrowTable"],
+            data_access_collection=DataAccessCollection(credentials={"genesis": Credential(token="test-token")}),
+        )
     values = result[0].column("destatis__bevoelkerung__kreise~value").to_pylist()
     assert values == [322616.0, 324013.0, 329538.0, 327065.0, 328036.0], values
     steps = [step.feature_group_name for step in result.plan if step.step_kind == "compute"]
@@ -125,13 +134,11 @@ def test_land_population_pins_the_captured_payload() -> None:
     assert source.credential_env == ["GENESIS_TOKEN"]
 
 
-def test_recipe_runs_through_mloda_in_a_fresh_process(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GENESIS_TOKEN", "test-token")
+def test_recipe_runs_through_mloda_in_a_fresh_process(tmp_path: Path) -> None:
     _fresh_process(_RUN_SCRIPT, str(LAND_RECIPE), str(LAND_TABLE_ZIP), str(tmp_path))
 
 
-def test_the_rebased_recipe_runs_in_a_fresh_process(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GENESIS_TOKEN", "test-token")
+def test_the_rebased_recipe_runs_in_a_fresh_process(tmp_path: Path) -> None:
     keys = REFERENCE_FIXTURES / "bbsr-ref-kreise-extract.xlsx"
     recipe = RECIPES_DIR / "kreis_population_rebased.json"
     _fresh_process(_REBASE_SCRIPT, str(recipe), str(FFCSV_FIXTURES / GOETTINGEN_ZIP), str(keys), str(tmp_path))

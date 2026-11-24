@@ -1,4 +1,4 @@
-"""Marimo notebooks must define their apps without running any cell; their imports and the docs' must exist."""
+"""Marimo notebooks define their apps; their imports and the docs' exist; live, every tutorial runs to the end."""
 
 import ast
 import importlib.util
@@ -40,6 +40,7 @@ def test_globs_find_all_notebooks_and_docs() -> None:
         REPO_ROOT / "tutorials" / "03_destatis_table.py",
         REPO_ROOT / "tutorials" / "04_todays_borders.py",
         REPO_ROOT / "tutorials" / "05_recipes_and_provenance.py",
+        REPO_ROOT / "tutorials" / "06_a_new_election.py",
     }
     assert expected <= set(NOTEBOOK_PATHS)
     guarded = ("03_destatis_table.py", "04_todays_borders.py", "05_recipes_and_provenance.py")
@@ -174,3 +175,23 @@ def test_tutorial_stops_without_credentials(path: Path, monkeypatch: pytest.Monk
     assert held_back
     _, defs = _load_app(path).run()
     assert held_back.isdisjoint(defs)
+
+
+def _fail_on_stop(predicate: object, output: object = None) -> None:
+    if predicate:
+        raise AssertionError(f"mo.stop fired: {getattr(output, 'text', output)}")
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        pytest.param(path, marks=[pytest.mark.live, *([pytest.mark.genesis_live] if path in GUARDED_PATHS else [])])
+        for path in NOTEBOOK_PATHS
+        if path.parent.name == "tutorials"
+    ],
+    ids=lambda path: str(path.relative_to(REPO_ROOT)),
+)
+def test_tutorial_runs_every_cell_live(path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A stopped cell is skipped silently, so any stop must fail here.
+    monkeypatch.setattr(marimo, "stop", _fail_on_stop)
+    _load_app(path).run()

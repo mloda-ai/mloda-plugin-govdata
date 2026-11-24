@@ -5,12 +5,13 @@ Datenlizenz Deutschland - Namensnennung - Version 2.0 (DL-DE-BY-2.0), Eurostat u
 CC BY 4.0 (CC-BY-4.0). Hashes below are the *original* published file's sha256, fetched and pinned
 2026-08-17 (see the fixtures' own ``NOTICE`` for the matching extract hashes); BBSR re-pinned
 2026-09-24 after the 2024-2025 sheet was added, the earlier sheets unchanged; Eurostat LAU-to-NUTS re-pinned
-2026-10-21 after a re-publication that left the DE sheet unchanged.
+2026-10-21 and 2026-11-24, each after a re-publication that left the DE sheet unchanged.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from mloda_plugin_govdata.feature_groups.govdata.core.discovery import CC_BY_4_0, DL_DE_BY_2_0
 
@@ -22,6 +23,15 @@ class ReferenceSource:
     sha256: str | None  # None when the URL varies per call (GV-ISys per year) and no single hash applies
     license: str
     attribution: str
+
+
+@dataclass(frozen=True)
+class ReferenceCopy:
+    """A source and its cached copy; ``sha256`` and ``retrieved_at`` are None when no pinned copy is cached."""
+
+    source: ReferenceSource
+    sha256: str | None
+    retrieved_at: datetime | None
 
 
 BBSR_KREISE = ReferenceSource(
@@ -43,7 +53,7 @@ EUROSTAT_NUTS_CORRESPONDENCE = ReferenceSource(
 EUROSTAT_LAU_NUTS = ReferenceSource(
     name="Eurostat LAU-to-NUTS correspondence (EU-27-LAU-2025-NUTS-2024)",
     url="https://ec.europa.eu/eurostat/documents/345175/501971/EU-27-LAU-2025-NUTS-2024.xlsx/574c9e4a-2dae-99fe-5510-3fd18d8e90c2",
-    sha256="9fd84ca59e36c2d494ccf0d7009f14feaa304a3943877c7d6533f736265aaf73",
+    sha256="5cfb4dc995746a4b5b8a60994e91e9bdc82bfdf68769c05b171d475d16a9c799",
     license=CC_BY_4_0,
     attribution="Source: Eurostat.",
 )
@@ -56,17 +66,15 @@ GV_ISYS_URL_TEMPLATE = (
     "Namens-Grenz-Aenderung/{year}.xlsx?__blob=publicationFile&v=5"
 )
 GV_ISYS_2016_SHA256 = "301a0b72381d78ece5b3fe811fd29e7739258da55ebda9dacb1a0d2651f2b0b7"
+_KNOWN_GV_ISYS_SHA256: dict[int, str] = {2016: GV_ISYS_2016_SHA256}
 
 
 def gv_isys_source(year: int, *, sha256: str | None = None) -> ReferenceSource:
-    """Builds the :class:`ReferenceSource` for one year of Destatis' GV-ISys change file.
-
-    Pass ``sha256=GV_ISYS_2016_SHA256`` for 2016; other years have no pinned hash yet.
-    """
+    """The :class:`ReferenceSource` for one year of Destatis' GV-ISys change file; ``sha256`` defaults to the pin."""
     return ReferenceSource(
         name=f"Destatis GV-ISys Namens-Grenz-Aenderung {year}",
         url=GV_ISYS_URL_TEMPLATE.format(year=year),
-        sha256=sha256,
+        sha256=sha256 or _KNOWN_GV_ISYS_SHA256.get(year),
         license=DL_DE_BY_2_0,
         attribution="(c) Statistisches Bundesamt (Destatis)",
     )

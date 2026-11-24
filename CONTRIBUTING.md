@@ -53,7 +53,7 @@ All of these must pass before a PR is mergeable. A separate `tox -e security` en
 
 - **Type hints**: use modern forms (`list[str]`, `dict[str, int]`, `X | None`).
 - **Line length**: 120.
-- **Tests**: every new feature or bug fix must come with tests; follow the patterns in `tests/` and `mloda_plugin_govdata/feature_groups/govdata/tests/`. Tests that reach the live publisher endpoints are marked `@pytest.mark.live` and deselected by default; run them with `pytest -m live`.
+- **Tests**: every new feature or bug fix must come with tests; follow the patterns in `tests/` and `mloda_plugin_govdata/feature_groups/govdata/tests/`. Tests that reach the live publisher endpoints are marked `@pytest.mark.live` and deselected by default; run them with `pytest -m live`. `pytest -m live tests/test_demo_definition.py` runs every tutorial end to end (set `GENESIS_TOKEN` for tutorials 3 to 5); the manual "Tutorials (live)" workflow does the same in CI.
 - **Commits**: use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`, `style:`, `ci:`, `build:`, `perf:`). semantic-release uses standard rules: `feat:` triggers a minor bump, all others trigger a patch (see `.releaserc.yaml`).
 - **No `Co-Authored-By` lines or other AI agent mentions** in commit messages or PR descriptions.
 

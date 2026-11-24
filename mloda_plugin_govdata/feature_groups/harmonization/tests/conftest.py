@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 import pytest
 import respx
+from mloda.user import Credential, DataAccessCollection
 
 from mloda_plugin_govdata.feature_groups.destatis.core.hosts import GENESIS_ONLINE
 from mloda_plugin_govdata.feature_groups.destatis.reader import DestatisReader
@@ -36,6 +37,11 @@ GOETTINGEN_LOCATOR = {
 __all__ = ["EXTRACT"]  # the extract's own ReferenceSource, shared with the module tests
 
 
+def genesis_collection() -> DataAccessCollection:
+    """The run's GENESIS credential for the mocked host."""
+    return DataAccessCollection(credentials={"genesis": Credential(token=TOKEN)})
+
+
 @pytest.fixture
 def ffcsv_fixtures_dir() -> Path:
     return _PACKAGE / "feature_groups" / "destatis" / "tests" / "fixtures" / "ffcsv"
@@ -58,9 +64,8 @@ def govdata_fixtures_dir() -> Path:
 
 @pytest.fixture
 def genesis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ffcsv_fixtures_dir: Path) -> Callable[[str], respx.Route]:
-    """Isolated reader cache plus an env token; returns a mocker for the tablefile POST."""
+    """Isolated reader cache; returns a mocker for the tablefile POST (runs pass ``genesis_collection()``)."""
     monkeypatch.setattr(DestatisReader, "cache_dir", str(tmp_path))
-    monkeypatch.setenv("GENESIS_TOKEN", TOKEN)
 
     def mock(zip_name: str | bytes) -> respx.Route:
         zip_bytes = zip_name if isinstance(zip_name, bytes) else (ffcsv_fixtures_dir / zip_name).read_bytes()

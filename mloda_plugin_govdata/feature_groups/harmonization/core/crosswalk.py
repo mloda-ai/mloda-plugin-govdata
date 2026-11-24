@@ -48,7 +48,8 @@ def load_nuts_crosswalk(
     if len(periods) > 1:
         raise ValueError(f"Eurostat LAU-to-NUTS rows span multiple PERIOD values: {sorted(periods)}")
     year = periods.pop()
-    years = [year, *(c.effective_date_legal.year for c in gv_isys_changes)]
+    # The statistical date: a legal date can precede it, and data_year is a statistics year.
+    years = [year, *(c.effective_date_statistical.year for c in gv_isys_changes)]
     return NutsCrosswalk(
         gebietsstand=str(year),
         nuts_version=NUTS_VERSION,
