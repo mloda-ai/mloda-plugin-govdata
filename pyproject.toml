@@ -58,6 +58,8 @@ dev = [
     "bandit",
     "hypothesis",
     "packaging>=24.2",
+    "pyyaml",
+    "types-pyyaml",
     "respx",
     "pandas-stubs",
 ]
