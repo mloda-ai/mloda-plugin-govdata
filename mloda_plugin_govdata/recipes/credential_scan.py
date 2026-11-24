@@ -45,7 +45,7 @@ def reject_credentials(tree: Any) -> None:
     for parent, key in _keys(tree):
         where = f"{parent}.{key}" if parent else key
         if _credential_named(key) and not _CREDENTIAL_ENV_FIELD.fullmatch(where):
-            raise ValueError(f"{where}: {key!r} names a credential; credentials resolve from the environment")
+            raise ValueError(f"{where}: {key!r} names a credential; credentials go in the run's DataAccessCollection")
         if _token_shaped(key):
             raise ValueError(f"{parent or 'recipe'}: a key looks like an API token")
         if _matches_secret(key, secrets):

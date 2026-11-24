@@ -1,0 +1,68 @@
+name: Tutorials (live)
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the tutorials as web pages (GitHub Pages)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  tutorials:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Run every tutorial against the live sources
+        env:
+          GENESIS_TOKEN: ${{ secrets.GENESIS_TOKEN }}
+        run: |
+          if [ -z "$(printf %s "$GENESIS_TOKEN" | tr -d '[:space:]')" ]; then
+            echo "::error ::Set the GENESIS_TOKEN repository secret; without it tutorials 3 to 5 are skipped."
+            exit 1
+          fi
+          uv run --locked --all-extras --python 3.13 pytest -m live -rs tests/test_demo_definition.py
+
+      # The step above filled the download cache, so this second run asks the sources for little.
+      - name: Build the tutorial pages
+        if: inputs.publish
+        env:
+          GENESIS_TOKEN: ${{ secrets.GENESIS_TOKEN }}
+        run: uv run --locked --all-extras --python 3.13 python scripts/build_site.py --out site
+
+      - name: Upload the pages
+        if: inputs.publish
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  publish:
+    # From another branch the pages stay an artifact of the run, to look at before publishing.
+    if: inputs.publish && github.ref_name == github.event.repository.default_branch
+    needs: tutorials
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -1,4 +1,4 @@
-"""Host-scoped GENESIS credentials: the run's DataAccessCollection, then env; redacted."""
+"""Host-scoped GENESIS credentials, redacted; runs take them from the DataAccessCollection only."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from mloda.user import DataAccessCollection, Options
+from mloda.user import Credential, DataAccessCollection, Options
 
 from .errors import MissingCredentialsError, WrongHostCredentialsError
 from .hosts import GenesisHost
@@ -88,9 +88,14 @@ class DestatisCredentials:
 
     __str__ = __repr__
 
+    def to_credential(self) -> Credential:
+        """The collection entry for these credentials, tagged with the host."""
+        fields = {name: getattr(self, name) for name in ("token", "user", "password") if getattr(self, name)}
+        return Credential(host=self.host, **fields)
+
     @classmethod
     def from_env(cls, host: GenesisHost, environ: Mapping[str, str] | None = None) -> DestatisCredentials | None:
-        """Read the host's env vars; ``None`` when none is set, an error when the set is incomplete."""
+        """Caller-side: read the host's env vars; ``None`` when none is set, an error when the set is incomplete."""
         env = os.environ if environ is None else environ
         token, user, password = (_clean(env.get(host.env_var(suffix))) for suffix in ENV_SUFFIXES)
         if token is None and user is None and password is None:
@@ -102,32 +107,24 @@ class DestatisCredentials:
 
 
 def missing_credentials_message(host: GenesisHost) -> str:
-    token_var, user_var, password_var = (host.env_var(suffix) for suffix in ENV_SUFFIXES)
     return (
-        f"No credentials for {host.label}. Set {token_var} (personal API token), or {user_var} and "
-        f"{password_var}, or pass the token in the run's DataAccessCollection under the handle {host.name!r}. "
-        f"Registration is free and same-day: {host.registration_url}. Registrations are per host, so a token "
-        "from another GENESIS installation is not valid here."
+        f"No credentials for {host.label}. Register them in the run's DataAccessCollection under the handle "
+        f"{host.name!r}, e.g. Credential(token=os.environ[{host.env_var('TOKEN')!r}]), or pass DestatisCredentials "
+        f"to GenesisClient; the plugin never reads the environment. Registration is free and same-day: {host.registration_url}. Registrations are per "
+        "host, so a token from another GENESIS installation is not valid here."
     )
 
 
-def resolve_credentials(
-    host: GenesisHost,
-    explicit: DestatisCredentials | None = None,
-    environ: Mapping[str, str] | None = None,
-) -> DestatisCredentials:
-    """Explicit credentials (host must match), else the host's env vars, else a MissingCredentialsError."""
-    if explicit is not None:
-        if explicit.host != host.name:
-            raise WrongHostCredentialsError(
-                f"Credentials are scoped to host {explicit.host!r} but the request targets {host.name!r} "
-                f"({host.label}); registrations and tokens are separate per host."
-            )
-        return explicit
-    from_env = DestatisCredentials.from_env(host, environ)
-    if from_env is None:
+def resolve_credentials(host: GenesisHost, explicit: DestatisCredentials | None = None) -> DestatisCredentials:
+    """The explicit credentials (host must match), else a MissingCredentialsError."""
+    if explicit is None:
         raise MissingCredentialsError(missing_credentials_message(host))
-    return from_env
+    if explicit.host != host.name:
+        raise WrongHostCredentialsError(
+            f"Credentials are scoped to host {explicit.host!r} but the request targets {host.name!r} "
+            f"({host.label}); registrations and tokens are separate per host."
+        )
+    return explicit
 
 
 _CREDENTIAL_KEYS = frozenset({"host", "token", "user", "password"})

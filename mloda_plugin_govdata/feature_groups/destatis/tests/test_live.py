@@ -5,7 +5,7 @@ from typing import Any
 
 import pyarrow as pa
 import pytest
-from mloda.user import Feature, mloda
+from mloda.user import DataAccessCollection, Feature, mloda
 
 from mloda_plugin_govdata.feature_groups.destatis.core.api import GenesisClient
 from mloda_plugin_govdata.feature_groups.destatis.core.auth import DestatisCredentials
@@ -28,9 +28,10 @@ LIVE_LOCATORS = [{"name": "12411-0015", **KREIS_2016}, LAND_LOCATOR, {"name": "1
 @pytest.mark.parametrize("host_name", sorted(KNOWN_HOSTS))
 def test_whoami_and_logincheck(host_name: str) -> None:
     host = KNOWN_HOSTS[host_name]
-    if DestatisCredentials.from_env(host) is None:
+    credentials = DestatisCredentials.from_env(host)
+    if credentials is None:
         pytest.skip(f"no credentials for {host.label}: set {host.env_var('TOKEN')} or user plus password")
-    with GenesisClient(host) as client:
+    with GenesisClient(host, credentials) as client:
         assert client.whoami().user_agent.startswith("mloda-plugin-govdata/")
         reply = client.logincheck()
     assert reply.is_success and not reply.is_guest
@@ -41,11 +42,14 @@ def test_whoami_and_logincheck(host_name: str) -> None:
 @pytest.mark.parametrize("locator", LIVE_LOCATORS, ids=lambda locator: locator["name"])
 def test_tablefile_end_to_end(locator: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A real GENESIS table arrives as a typed Arrow table via mloda.run_all from a clean cache."""
-    if DestatisCredentials.from_env(GENESIS_ONLINE) is None:
+    credentials = DestatisCredentials.from_env(GENESIS_ONLINE)
+    if credentials is None:
         pytest.skip(f"no credentials for {GENESIS_ONLINE.label}: set {GENESIS_ONLINE.env_var('TOKEN')}")
     monkeypatch.setattr(DestatisReader, "cache_dir", str(tmp_path))
     result = mloda.run_all(
-        [Feature("value", options={DestatisReader.__name__: locator})], compute_frameworks=["PyArrowTable"]
+        [Feature("value", options={DestatisReader.__name__: locator})],
+        compute_frameworks=["PyArrowTable"],
+        data_access_collection=DataAccessCollection(credentials={"genesis": credentials.to_credential()}),
     )
     table = result[0]
     assert table.num_rows > 0

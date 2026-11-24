@@ -18,7 +18,8 @@ from .model import Compliance, LinkSpec, Recipe, RecipeError, error_summary
 
 @dataclass(frozen=True)
 class LoadedRecipe:
-    """What ``load_recipe`` returns: pass ``features`` and ``set(links)`` to ``mloda.run_all``."""
+    """What ``load_recipe`` returns: pass ``features`` and ``set(links)`` to ``mloda.run_all``, with the credentials
+    in its ``data_access_collection``."""
 
     features: list[Feature | str]
     links: list[Link]

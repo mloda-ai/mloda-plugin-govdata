@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from dataclasses import asdict
-from functools import partial
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -14,7 +13,7 @@ from mloda.provider import DefaultOptionKeys, FeatureSet, property_spec
 from mloda.user import Feature, FeatureName, Options
 
 from ..govdata.core.cache import CacheMissError, DownloadCache
-from .base import HarmonizationFeature, offline_first
+from .base import HarmonizationFeature
 from .core.rebase import (
     DEFAULT_TOLERANCE,
     KeySheet,
@@ -93,8 +92,12 @@ class KreisRebaseFeature(HarmonizationFeature):
         return True
 
     @classmethod
-    def _read_reference(cls, cache: DownloadCache, *, fetch: bool = False) -> list[UmsteigeschluesselRow]:
-        return offline_first(partial(load_bbsr_kreise, cache), fetch=fetch)
+    def _reference_files(cls) -> tuple[ReferenceSource, ...]:
+        return (BBSR_KREISE,)
+
+    @classmethod
+    def _read_reference(cls, cache: DownloadCache) -> list[UmsteigeschluesselRow]:
+        return load_bbsr_kreise(cache)
 
     @classmethod
     def load_keys(cls) -> tuple[Sequence[UmsteigeschluesselRow], ReferenceSource]:

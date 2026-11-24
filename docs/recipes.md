@@ -59,8 +59,8 @@ recipe.compliance.sources[0].attribution  # what to print next to the result
 - `compliance.sources`: one entry per data source with `license`, `attribution`, `dataset_uri`,
   `retrieved_at` (timezone-aware), the payload `sha256`, `modifications` (what the reader changes; dl-de/by-2-0
   requires marking changes), and `credential_env` (the env-var names of the source's default credential path,
-  never values; a GENESIS source names `GENESIS_TOKEN`, the user plus password pair from
-  [credentials.md](credentials.md) works the same).
+  never values; metadata only, nothing reads it; a GENESIS source names `GENESIS_TOKEN`, the user plus password
+  pair from [credentials.md](credentials.md) works the same).
 
 ## What round-trips
 
@@ -83,8 +83,8 @@ GENESIS token is one such run; only the compliance `sha256` field is exempt), a 
 in front of the host, an entry in `credential_env` that is not an env-var name, and any value of the
 process's own `GENESIS_*` or `REGIONALSTATISTIK_*` token and password variables found in the file (a user
 name too, when it carries a digit or `@`). Errors raised by `load_recipe`, `parse_recipe`, and
-`build_recipe` name the location, never the value. Credentials resolve at run time, from the run's
-`DataAccessCollection` or the environment; see [credentials.md](credentials.md).
+`build_recipe` name the location, never the value. Credentials come from the run's `DataAccessCollection`
+only; see [credentials.md](credentials.md).
 
 ## Where recipe files live
 
@@ -98,8 +98,7 @@ of each step that the documented call (`compute_frameworks=["PyArrowTable"]`) re
 code each reader can reach. The offline tests fail with a diff when a plan changes, a mloda upgrade or an edit
 to reader code included. Regenerate the recipes and locks with
 `uv run python scripts/write_recipes.py` and review the lock diff before committing. The locks are written without a
-`DataAccessCollection` (env credentials); a run with collection credentials adds the bound handle to its plan, so
-its lock differs by that handle.
+`DataAccessCollection`; a run with one adds the bound handle to its plan, so its lock differs by that handle.
 
 ## Shipped recipes
 

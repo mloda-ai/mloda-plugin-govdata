@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from functools import partial
 from pathlib import Path
 from typing import Any, ClassVar, Literal, cast
 
@@ -11,10 +10,11 @@ from mloda.provider import DefaultOptionKeys, FeatureSet, property_spec
 from mloda.user import Feature, FeatureName, Options
 
 from ..govdata.core.cache import CacheMissError, DownloadCache
-from .base import HarmonizationFeature, offline_first
+from .base import HarmonizationFeature
 from .core.crosswalk import NUTS_VERSION, NutsCrosswalk, load_nuts_crosswalk
 from .core.nuts import map_ags_to_nuts
 from .core.reference.gv_isys import load_gv_isys_changes
+from .core.reference.sources import EUROSTAT_LAU_NUTS, ReferenceSource, gv_isys_source
 
 NULL_KEY = "null key cell"
 _POLICIES = {"raise": "fail loud", "flag": "null codes, the reason in ~unmatched"}
@@ -48,13 +48,13 @@ class AgsToNutsFeature(HarmonizationFeature):
     history_years: ClassVar[tuple[int, ...]] = (2016,)
 
     @classmethod
-    def _read_reference(cls, cache: DownloadCache, *, fetch: bool = False) -> NutsCrosswalk:
-        changes = [
-            change
-            for year in cls.history_years
-            for change in offline_first(partial(load_gv_isys_changes, year, cache), fetch=fetch)
-        ]
-        return offline_first(partial(load_nuts_crosswalk, cache, gv_isys_changes=changes), fetch=fetch)
+    def _reference_files(cls) -> tuple[ReferenceSource, ...]:
+        return (EUROSTAT_LAU_NUTS, *(gv_isys_source(year) for year in cls.history_years))
+
+    @classmethod
+    def _read_reference(cls, cache: DownloadCache) -> NutsCrosswalk:
+        changes = [change for year in cls.history_years for change in load_gv_isys_changes(year, cache)]
+        return load_nuts_crosswalk(cache, gv_isys_changes=changes)
 
     @classmethod
     def load_crosswalk(cls) -> NutsCrosswalk:

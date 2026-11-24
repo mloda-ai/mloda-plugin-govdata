@@ -16,32 +16,32 @@ Registration is self-service (same-day in our own experience). The token is show
 
 Credentials never go into the URL or the form body: the server ignores body credentials and silently runs the call as guest (`Username: GAST`), which the client treats as an authentication failure. Redirects are not followed with credentials attached.
 
-## Resolution order
+## Where credentials come from
 
-1. Explicit: `DestatisCredentials(host="genesis", token=...)` (or `user=..., password=...`) passed to `GenesisClient`, for direct protocol use.
-2. The run's `DataAccessCollection`, the only way to pass credentials to an mloda run. Passed once to `run_all`, it reaches every Destatis feature, chained ones included:
+The plugin never reads the environment; the caller passes the credentials in.
+
+1. An mloda run takes them from its `DataAccessCollection`. Passed once to `run_all`, it reaches every Destatis feature, chained ones included:
 
    ```python
+   import os
+
    from mloda.user import Credential, DataAccessCollection
 
-   collection = DataAccessCollection(credentials={"genesis": Credential(token=...)})
+   collection = DataAccessCollection(credentials={"genesis": Credential(token=os.environ["GENESIS_TOKEN"])})
    mloda.run_all(features, data_access_collection=collection)
    ```
 
-   An entry counts only when its handle is a host name (`genesis`, `regionalstatistik`) or it carries a `host` key, so another plugin's token is never sent to GENESIS. Keys are `host`, `token`, `user`, `password`. Several entries for one host are refused; keep one. The collection is checked while features resolve, so a misconfigured entry fails the run even when the table is cached. The handle the reader binds shows in `mloda.explain`, on the plan step (`bound_credential_handle`) and in the plan lock; the value never does.
+   `DestatisCredentials.from_env(host).to_credential()` builds the entry from the env vars above. An entry counts only when its handle is a host name (`genesis`, `regionalstatistik`) or it carries a `host` key. Keys are `host`, `token`, `user`, `password`; several entries for one host are refused. The handle shows in `mloda.explain`, on the plan step and in the plan lock; the value never does.
 
-   The `genesis_credentials` options key is retired: a feature carrying it, in group or context, chained ones included, is refused at match time. Register the credential in the collection instead, and rotate a token that was passed in `group` (group options are printed with the feature). One run uses one credential per host; there is no per-feature override.
-3. Env vars of the host, chosen by the host prefix. Whitespace is stripped. A half-set pair (`GENESIS_USER` without `GENESIS_PASSWORD`, or the reverse) is an error, never a fallback to the token or to the other host.
-4. Otherwise `MissingCredentialsError` names the env vars and the registration page for that host. Nothing is sent.
+   The `genesis_credentials` options key is retired and refused at match time.
+2. `GenesisClient` takes `DestatisCredentials(host="genesis", token=...)` (or `user=..., password=...`) for direct protocol use.
 
-Credentials scoped to one host are refused on the other (`WrongHostCredentialsError`), and env resolution never falls back across hosts.
-
-Credentials are needed on a cache miss only: a selection already in the parameter cache is served without them, so an offline rerun (and `peek` on a cached table) works with no env vars set.
+A cached selection needs no credentials; a cache miss with none registered raises `MissingCredentialsError` before any request. Credentials scoped to one host are refused on the other (`WrongHostCredentialsError`).
 
 ```python
-from mloda_plugin_govdata.feature_groups.destatis import GenesisClient
+from mloda_plugin_govdata.feature_groups.destatis import GENESIS_ONLINE, DestatisCredentials, GenesisClient
 
-with GenesisClient("genesis") as client:  # credentials from GENESIS_TOKEN
+with GenesisClient(GENESIS_ONLINE, DestatisCredentials.from_env(GENESIS_ONLINE)) as client:
     client.logincheck()  # raises GenesisAuthError if rejected or run as guest
 ```
 
@@ -69,4 +69,4 @@ GENESIS_TOKEN=... pytest -m "live and genesis_live"
 
 ## Notebooks
 
-Tutorials 3 to 5 resolve credentials the same way and stop, naming the reason, when none are set.
+Tutorials 3 to 5 read the env vars with `from_env` and stop, naming the reason, when none are set.

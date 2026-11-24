@@ -6,7 +6,6 @@ import pytest
 from mloda.user import Credential, DataAccessCollection, Options
 
 from mloda_plugin_govdata.feature_groups.destatis.core.auth import (
-    ENV_SUFFIXES,
     OPTION_GENESIS_CREDENTIALS,
     DestatisCredentials,
     credentials_from_collection,
@@ -69,46 +68,63 @@ def test_control_characters_and_non_latin1_are_refused_without_echo() -> None:
         DestatisCredentials(user=USER, password="p\rw")
 
 
-def test_env_resolution_is_host_prefixed() -> None:
+def test_from_env_is_host_prefixed() -> None:
     environ = {"GENESIS_TOKEN": TOKEN, "REGIONALSTATISTIK_USER": USER, "REGIONALSTATISTIK_PASSWORD": PASSWORD}
-    genesis = resolve_credentials(GENESIS_ONLINE, environ=environ)
-    regional = resolve_credentials(REGIONALSTATISTIK, environ=environ)
+    genesis = DestatisCredentials.from_env(GENESIS_ONLINE, environ)
+    regional = DestatisCredentials.from_env(REGIONALSTATISTIK, environ)
+    assert genesis is not None and regional is not None
     assert genesis.headers()["username"] == TOKEN and genesis.host == "genesis"
     assert regional.headers() == {"username": USER, "password": PASSWORD} and regional.host == "regionalstatistik"
 
 
-def test_env_never_falls_back_to_the_other_host() -> None:
+def test_from_env_never_falls_back_to_the_other_host() -> None:
+    assert DestatisCredentials.from_env(REGIONALSTATISTIK, {"GENESIS_TOKEN": TOKEN}) is None
+
+
+def test_missing_credentials_name_the_handle_and_registration(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("REGIONALSTATISTIK_TOKEN", TOKEN)  # never read
     with pytest.raises(MissingCredentialsError) as info:
-        resolve_credentials(REGIONALSTATISTIK, environ={"GENESIS_TOKEN": TOKEN})
+        resolve_credentials(REGIONALSTATISTIK)
     message = str(info.value)
-    for suffix in ENV_SUFFIXES:
-        assert f"REGIONALSTATISTIK_{suffix}" in message
+    assert "DataAccessCollection under the handle 'regionalstatistik'" in message
     assert REGIONALSTATISTIK.registration_url in message
     assert "free" in message and "same-day" in message
     assert TOKEN not in message
 
 
-def test_env_half_password_path_is_an_error_naming_the_missing_var() -> None:
+def test_from_env_half_password_path_is_an_error_naming_the_missing_var() -> None:
     with pytest.raises(MissingCredentialsError, match="GENESIS_PASSWORD"):
-        resolve_credentials(GENESIS_ONLINE, environ={"GENESIS_USER": USER})
+        DestatisCredentials.from_env(GENESIS_ONLINE, {"GENESIS_USER": USER})
 
 
-def test_env_half_password_path_is_an_error_even_with_a_token() -> None:
+def test_from_env_half_password_path_is_an_error_even_with_a_token() -> None:
     with pytest.raises(MissingCredentialsError, match="GENESIS_PASSWORD") as info:
-        resolve_credentials(GENESIS_ONLINE, environ={"GENESIS_TOKEN": TOKEN, "GENESIS_USER": USER})
+        DestatisCredentials.from_env(GENESIS_ONLINE, {"GENESIS_TOKEN": TOKEN, "GENESIS_USER": USER})
     assert TOKEN not in str(info.value)
 
 
-def test_explicit_credentials_win_over_env_and_must_match_the_host() -> None:
+def test_explicit_credentials_must_match_the_host() -> None:
     explicit = DestatisCredentials(host="genesis", token=TOKEN)
-    assert resolve_credentials(GENESIS_ONLINE, explicit, environ={"GENESIS_TOKEN": "other"}) is explicit
+    assert resolve_credentials(GENESIS_ONLINE, explicit) is explicit
     with pytest.raises(WrongHostCredentialsError, match="separate per host"):
-        resolve_credentials(REGIONALSTATISTIK, explicit, environ={})
+        resolve_credentials(REGIONALSTATISTIK, explicit)
 
 
-def test_env_whitespace_is_normalized() -> None:
-    credentials = resolve_credentials(GENESIS_ONLINE, environ={"GENESIS_TOKEN": f" {TOKEN} \t"})
-    assert credentials.headers()["username"] == TOKEN
+def test_from_env_whitespace_is_normalized() -> None:
+    credentials = DestatisCredentials.from_env(GENESIS_ONLINE, {"GENESIS_TOKEN": f" {TOKEN} \t"})
+    assert credentials is not None and credentials.headers()["username"] == TOKEN
+
+
+@pytest.mark.parametrize(
+    "credentials",
+    [DestatisCredentials(token=TOKEN), DestatisCredentials(host="regionalstatistik", user=USER, password=PASSWORD)],
+)
+def test_to_credential_round_trips_through_the_collection(credentials: DestatisCredentials) -> None:
+    collection = DataAccessCollection(credentials={"any-handle": credentials.to_credential()})
+    found = credentials_from_collection(
+        collection, GENESIS_ONLINE if credentials.host == "genesis" else REGIONALSTATISTIK
+    )
+    assert found is not None and found[1] == credentials
 
 
 def test_options_without_the_retired_key_pass() -> None:
@@ -122,7 +138,8 @@ def test_unknown_host_with_explicit_prefix() -> None:
         "zensus", "https://example.org/rest/2020", "ZENSUS", "https://example.org/", "Zensus (example)"
     )
     assert zensus.base_url.endswith("/")
-    assert resolve_credentials(zensus, environ={"ZENSUS_TOKEN": TOKEN}).host == "zensus"
+    from_env = DestatisCredentials.from_env(zensus, {"ZENSUS_TOKEN": TOKEN})
+    assert from_env is not None and from_env.host == "zensus"
     with pytest.raises(ValueError, match="upper-case"):
         GenesisHost("x", "https://example.org/", "zensus", "https://example.org/", "x")
 

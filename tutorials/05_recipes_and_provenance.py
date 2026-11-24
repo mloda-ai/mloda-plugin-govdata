@@ -43,32 +43,28 @@ def _(mo):
 def _():
     import pandas as pd
 
-    from mloda.user import Feature, mloda
+    from mloda.user import DataAccessCollection, Feature, mloda
     from mloda_plugin_govdata.feature_groups.destatis import (
         GENESIS_ONLINE,
         DestatisCredentials,
-        DestatisLocator,
         DestatisReader,
         MissingCredentialsError,
-        ParameterCache,
     )
-    from mloda_plugin_govdata.feature_groups.govdata import BundeswahlleiterinReader, DownloadCache
+    from mloda_plugin_govdata.feature_groups.govdata import BundeswahlleiterinReader
     from mloda_plugin_govdata.feature_groups.harmonization import check_land_names
     from mloda_plugin_govdata.feature_groups.land_population_per_voter import LAND_LOCATOR, LandPopulationPerVoter
     from mloda_plugin_govdata.recipes import load_recipe
 
     return (
         BundeswahlleiterinReader,
+        DataAccessCollection,
         DestatisCredentials,
-        DestatisLocator,
         DestatisReader,
-        DownloadCache,
         Feature,
         GENESIS_ONLINE,
         LAND_LOCATOR,
         LandPopulationPerVoter,
         MissingCredentialsError,
-        ParameterCache,
         check_land_names,
         load_recipe,
         mloda,
@@ -77,12 +73,16 @@ def _():
 
 
 @app.cell
-def _(DestatisCredentials, GENESIS_ONLINE, MissingCredentialsError, mo):
+def _(DataAccessCollection, DestatisCredentials, GENESIS_ONLINE, MissingCredentialsError, mo):
     # Every later cell takes a name from this cell, so mo.stop holds them all back.
     _why = None
+    _collection = None
     try:
-        if DestatisCredentials.from_env(GENESIS_ONLINE) is None:
+        _credentials = DestatisCredentials.from_env(GENESIS_ONLINE)
+        if _credentials is None:
             _why = "No token found: `GENESIS_TOKEN` is not set (nor `GENESIS_USER` and `GENESIS_PASSWORD`)."
+        else:
+            _collection = DataAccessCollection(credentials={"genesis": _credentials.to_credential()})
     except MissingCredentialsError:  # a user name without a password, or the reverse
         _why = "Set both `GENESIS_USER` and `GENESIS_PASSWORD`, or only `GENESIS_TOKEN`."
     except ValueError:  # a character that cannot be part of a token, e.g. a copied quote mark
@@ -92,8 +92,9 @@ def _(DestatisCredentials, GENESIS_ONLINE, MissingCredentialsError, mo):
     elif mo.notebook_dir() is None or not (mo.notebook_dir().parent / "recipes").is_dir():
         _why = "This notebook cannot find the `recipes/` folder. Open it from your clone of the repository."
     mo.stop(_why is not None, mo.md(f"**Stopped.** {_why}"))
+    collection = _collection
     recipes = mo.notebook_dir().parent / "recipes"
-    return (recipes,)
+    return collection, recipes
 
 
 @app.cell
@@ -134,8 +135,13 @@ def _(mo):
 
 
 @app.cell
-def _(mloda, recipe):
-    _result = mloda.run_all(recipe.features, compute_frameworks=["PyArrowTable"], column_ordering="request_order")
+def _(collection, mloda, recipe):
+    _result = mloda.run_all(
+        recipe.features,
+        compute_frameworks=["PyArrowTable"],
+        column_ordering="request_order",
+        data_access_collection=collection,
+    )
     population = _result.frame_for("value").to_pandas().sort_values("1_variable_attribute_code", ignore_index=True)
     election = _result.frame_for("Nr").to_pandas()
     lands = election[election["gehört zu"] == "99"].sort_values("Nr", ignore_index=True)
@@ -177,9 +183,11 @@ def _(mo):
 
 
 @app.cell
-def _(Feature, LandPopulationPerVoter, mloda, recipe):
+def _(Feature, LandPopulationPerVoter, collection, mloda, recipe):
     _after_step_1 = recipe  # waits for the token check and Step 1
-    _table = mloda.run_all([Feature(LandPopulationPerVoter.NAME)], compute_frameworks=["PyArrowTable"])[0]
+    _table = mloda.run_all(
+        [Feature(LandPopulationPerVoter.NAME)], compute_frameworks=["PyArrowTable"], data_access_collection=collection
+    )[0]
     per_voter = _table.to_pandas()
     per_voter.columns = [_name.rpartition("~")[2] for _name in per_voter.columns]  # keep only the part name
     per_voter[["code", "land", "population", "voters", "value"]]
@@ -278,34 +286,24 @@ def _(mo):
 
 
 @app.cell
-def _(
-    BundeswahlleiterinReader,
-    DestatisLocator,
-    DestatisReader,
-    DownloadCache,
-    GENESIS_ONLINE,
-    LAND_LOCATOR,
-    ParameterCache,
-    mo,
-    per_voter,
-    recipe,
-):
+def _(BundeswahlleiterinReader, DestatisReader, LAND_LOCATOR, mo, per_voter, recipe):
     _after_step_3 = per_voter  # Steps 2 and 3 put both copies on disk
     _destatis, _election = recipe.compliance.sources
     # LAND_LOCATOR names the same table and year as the recipe.
-    _destatis_copy = ParameterCache(DestatisReader.cache_dir).lookup(
-        GENESIS_ONLINE, "data/tablefile", DestatisLocator(**LAND_LOCATOR).tablefile_fields()
-    )
-    with DownloadCache(BundeswahlleiterinReader.cache_dir) as _cache:
-        _election_copy = _cache.get_or_download(_election.dataset_uri, revalidate=False)
+    _destatis_copy = DestatisReader.retrieval(LAND_LOCATOR)
+    _election_copy = BundeswahlleiterinReader.retrieval(_election.dataset_uri)
     _destatis_yours = (
         f"you on {_destatis_copy.retrieved_at:%Y-%m-%d}" if _destatis_copy else "your copy is no longer in the cache"
     )
-    _same = (
-        "the same file"
-        if _election_copy.sha256 == _election.sha256
-        else "a different file: it changed between the two downloads"
-    )
+    if _election_copy is None:
+        _election_yours, _same = "your copy is no longer in the cache", "nothing to compare"
+    else:
+        _election_yours = f"you on {_election_copy.retrieved_at:%Y-%m-%d}"
+        _same = (
+            "the same file"
+            if _election_copy.sha256 == _election.sha256
+            else "a different file: it changed between the two downloads"
+        )
     mo.md(f"""
     - **{_destatis.attribution}**, license `{_destatis.license}`, {_destatis.dataset_uri}. The recipe's author
       downloaded it on {_destatis.retrieved_at:%Y-%m-%d}, {_destatis_yours}. Its checksum cannot be compared:
@@ -313,7 +311,7 @@ def _(
       request, so the checksum changes on every download, even when no number does. Changes recorded in the
       recipe: {"; ".join(_destatis.modifications)}.
     - **{_election.attribution}**, license `{_election.license}`, {_election.dataset_uri}. The recipe's author
-      downloaded it on {_election.retrieved_at:%Y-%m-%d}, you on {_election_copy.retrieved_at:%Y-%m-%d}. The
+      downloaded it on {_election.retrieved_at:%Y-%m-%d}, {_election_yours}. The
       checksums say: {_same}. Changes recorded in the recipe: {"; ".join(_election.modifications)}.
     """)
     return
@@ -332,7 +330,8 @@ def _(mo):
 
     ## Next
 
-    The next tutorial reads a new election with configuration only, no new code.
+    [Tutorial 6](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/06_a_new_election.py)
+    reads four Berlin elections with one set of reader options.
     [Recipes](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/docs/recipes.md) describes the file
     format, every shipped recipe and how each one is checked against its sources.
     """)

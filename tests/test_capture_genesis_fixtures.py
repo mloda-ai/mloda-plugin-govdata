@@ -26,7 +26,7 @@ def _instant_backoff(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _client(tmp_path: Path) -> GenesisClient:
-    return GenesisClient(GENESIS_ONLINE, None, lock_dir=tmp_path, environ={})
+    return GenesisClient(GENESIS_ONLINE, None, lock_dir=tmp_path)
 
 
 def _zip(member: str = "data.csv", text: str = "", comment: bytes = b"", encoding: str = "utf-8") -> bytes:

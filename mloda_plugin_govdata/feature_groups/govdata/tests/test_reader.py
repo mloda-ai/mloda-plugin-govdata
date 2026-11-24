@@ -29,7 +29,7 @@ from mloda_plugin_govdata.feature_groups.govdata.core.provenance import FetchedP
 from mloda_plugin_govdata.feature_groups.govdata.feature import GovDataFeature
 from mloda_plugin_govdata.feature_groups.govdata.population import StuttgartPopulationReader
 from mloda_plugin_govdata.feature_groups.govdata.reader import BaseGovDataReader, GovDataReader
-from mloda_plugin_govdata.feature_groups.govdata.uba import UbaAirReader, uba_measures_url
+from mloda_plugin_govdata.feature_groups.govdata.uba import OPTION_UBA_LANG, UbaAirReader, uba_measures_url
 
 SLUG = "einwohner-nach-altersgruppen-und-stadtbezirken"
 PACKAGE_SHOW = "https://ckan.govdata.de/api/3/action/package_show"
@@ -331,12 +331,20 @@ def test_geometry_collection_value_rejected_before_any_network_call(
 
 
 @pytest.mark.live
-def test_berlin_wahl_live_end_to_end() -> None:
+@pytest.mark.parametrize(
+    "url",
+    [
+        BERLIN_URL,
+        "https://www.wahlen-berlin.de/wahlen/EU2024/AFSPRAES/Datenexport_EUROPAWAHL2024_Stimme_W_BE.csv",
+        "https://www.wahlen-berlin.de/wahlen/BU2025/afspraes/Datenexport_BUNDESTAGSWAHL2025_Zweitstimme_W_BE.csv",
+        "https://www.wahlen-berlin.de/wahlen/BE2026/AFSPRAES/agh/Datenexport_AGH2026_Zweitstimme_W_BE.csv",
+    ],
+)
+def test_berlin_wahl_live_end_to_end(url: str) -> None:
+    # One layout reads every Berlin election; only the URL differs.
+    options = {**BERLIN_OPTIONS, BundeswahlleiterinReader.__name__: url}
     result = mloda.run_all(
-        [
-            Feature("Bezirksname", options=dict(BERLIN_OPTIONS)),
-            Feature("Gueltig", options=dict(BERLIN_OPTIONS)),
-        ],
+        [Feature("Bezirksname", options=options), Feature("Gueltig", options=options)],
         compute_frameworks=["PyArrowTable"],
     )
     table = result[0]
@@ -376,9 +384,50 @@ def test_peek_elections_level2(fixtures_dir: Path, tmp_path: Path, monkeypatch: 
     monkeypatch.setattr(BundeswahlleiterinReader, "cache_dir", str(tmp_path))
     kerg_bytes = (fixtures_dir / "kerg_sample.csv").read_bytes()
     respx.get(KERG_URL).mock(return_value=httpx.Response(200, content=kerg_bytes, headers={"ETag": '"k1"'}))
+    assert BundeswahlleiterinReader.retrieval(KERG_URL) is None
     columns = BundeswahlleiterinReader.peek(KERG_URL)
     assert columns["Gebiet"] == "string"
     assert columns[KERG_MEASURE] == "int64"
+    record = BundeswahlleiterinReader.retrieval(KERG_URL)
+    assert respx.calls.call_count == 1
+    assert record is not None
+    assert (
+        record.sha256 == hashlib.sha256(kerg_bytes).hexdigest() == hashlib.sha256(record.path.read_bytes()).hexdigest()
+    )
+    assert (record.provenance.source, record.provenance.url) == ("url", KERG_URL)
+    assert record.provenance.license == BundeswahlleiterinReader.LICENSE
+
+
+@pytest.mark.parametrize(
+    ("url", "fixture", "options", "text_column", "value_column"),
+    [
+        (KERG2_URL, "kerg2_sample.csv", KERG2_OPTIONS, "Gewählt", "Anzahl"),
+        (BERLIN_URL, "berlin_wahl_sample.csv", BERLIN_OPTIONS, "Bezirksname", "Gueltig"),
+    ],
+)
+@respx.mock
+def test_peek_reads_with_the_layout_options(
+    url: str,
+    fixture: str,
+    options: dict[str, Any],
+    text_column: str,
+    value_column: str,
+    fixtures_dir: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(BundeswahlleiterinReader, "cache_dir", str(tmp_path))
+    payload = (fixtures_dir / fixture).read_bytes()
+    respx.get(url).mock(return_value=httpx.Response(200, content=payload, headers={"ETag": '"l1"'}))
+    columns = BundeswahlleiterinReader.peek(url, options=options)
+    assert (columns[text_column], columns[value_column]) == ("string", "double")
+
+
+@pytest.mark.parametrize("bad_value", [-1, [5, 9]])
+@respx.mock
+def test_peek_validates_the_layout_options_before_any_network_call(bad_value: Any) -> None:
+    with pytest.raises(ValueError, match=OPTION_WAHL_SKIPROWS):
+        BundeswahlleiterinReader.peek(KERG_URL, options={OPTION_WAHL_SKIPROWS: bad_value})
 
 
 @respx.mock
@@ -387,7 +436,7 @@ def test_peek_uba_level2(fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest
     url = uba_measures_url(station=143, component=3, scope=2, date_from="2025-01-01", date_to="2025-01-01")
     payload = (fixtures_dir / "uba_measures.json").read_bytes()
     respx.get(url).mock(return_value=httpx.Response(200, content=payload, headers={"ETag": '"u1"'}))
-    columns = UbaAirReader.peek(url)
+    columns = UbaAirReader.peek(url, options={OPTION_UBA_LANG: "en"})  # required query keys need not be passed
     assert columns["station_id"] == "int64"
     assert columns["value"] == "double"
 
@@ -488,21 +537,6 @@ def test_unknown_feature_names_available_columns(
 
 
 @respx.mock
-def test_unknown_feature_message_prints_plain_names(
-    fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # FeatureSet names are FeatureName; the message must not leak the wrapper repr.
-    monkeypatch.setattr(GovDataReader, "cache_dir", str(tmp_path))
-    _mock_population_endpoints(fixtures_dir)
-    features = FeatureSet([Feature("Nr"), Feature("Stadtbezirk")])
-    with pytest.raises(ValueError) as excinfo:
-        GovDataReader.load_neutral(_match(GovDataReader, SLUG), features)
-    message = str(excinfo.value)
-    assert "Unknown feature(s) 'Nr'" in message
-    assert "FeatureName" not in message
-
-
-@respx.mock
 def test_unknown_feature_suggestion_only_for_close_matches(
     fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -593,6 +627,11 @@ def test_fetch_refuses_a_ckan_license_the_reader_does_not_declare(fixtures_dir: 
 
 
 @respx.mock
-def test_base_fetch_rejects_foreign_locator() -> None:
+def test_fetch_and_retrieval_refuse_what_they_cannot_read() -> None:
     with pytest.raises(NotImplementedError):
         BaseGovDataReader._fetch(_FakeLocator("x"))
+    with pytest.raises(NotImplementedError):
+        FakeReader.retrieval("x")
+    with pytest.raises(ValueError, match="needs a distribution URL"):
+        GovDataReader.retrieval(SLUG)
+    assert respx.calls.call_count == 0

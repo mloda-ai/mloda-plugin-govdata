@@ -349,14 +349,14 @@ def test_hit_makes_zero_http_calls_and_needs_no_credentials(tmp_path: Path) -> N
     with respx.mock(assert_all_called=False) as router:
         route = router.post(BASE + ENDPOINT).mock(return_value=httpx.Response(200, content=ZIP))
         cache = ParameterCache(tmp_path)
-        with GenesisClient(GENESIS_ONLINE, DestatisCredentials(token=TOKEN), lock_dir=tmp_path, environ={}) as client:
+        with GenesisClient(GENESIS_ONLINE, DestatisCredentials(token=TOKEN), lock_dir=tmp_path) as client:
             first = cache.get_or_fetch(GENESIS_ONLINE, ENDPOINT, PARAMS, lambda wire: client.call(ENDPOINT, wire).body)
             second = cache.get_or_fetch(GENESIS_ONLINE, ENDPOINT, PARAMS, lambda wire: client.call(ENDPOINT, wire).body)
         assert route.call_count == 1 and second == first and first.path.read_bytes() == ZIP
         sent = httpx.QueryParams(route.calls.last.request.content.decode())
         assert dict(sent) == CANONICAL  # what was keyed is what went over the wire
         # A hit never resolves credentials: the client below has none and would raise on any request.
-        with GenesisClient(GENESIS_ONLINE, lock_dir=tmp_path, environ={}) as anonymous:
+        with GenesisClient(GENESIS_ONLINE, lock_dir=tmp_path) as anonymous:
             third = cache.get_or_fetch(
                 GENESIS_ONLINE, ENDPOINT, PARAMS, lambda wire: anonymous.call(ENDPOINT, wire).body
             )

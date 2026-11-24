@@ -70,6 +70,7 @@ class SourceCompliance(BaseModel):
     retrieved_at: AwareDatetime
     sha256: str
     modifications: list[str] = Field(default_factory=list)
+    # Metadata only: the env vars a caller reads to register the run's Credential; no reader or mloda reads it.
     credential_env: list[str] = Field(default_factory=list)
 
     @field_validator("dataset_uri")

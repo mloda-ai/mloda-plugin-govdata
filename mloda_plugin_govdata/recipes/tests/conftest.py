@@ -11,7 +11,7 @@ from urllib.parse import parse_qs
 import httpx
 import pytest
 import respx
-from mloda.user import Feature, Link, mloda
+from mloda.user import Credential, DataAccessCollection, Feature, Link, mloda
 
 from mloda_plugin_govdata.feature_groups.destatis.core.hosts import GENESIS_ONLINE
 from mloda_plugin_govdata.feature_groups.destatis.reader import DestatisReader
@@ -45,7 +45,10 @@ class Mock(Protocol):
 
 
 def run(features: Iterable[Feature | str], links: Iterable[Link] = ()) -> Any:
-    return mloda.run_all(list(features), compute_frameworks=["PyArrowTable"], links=set(links))
+    collection = DataAccessCollection(credentials={"genesis": Credential(token=TOKEN)})
+    return mloda.run_all(
+        list(features), compute_frameworks=["PyArrowTable"], links=set(links), data_access_collection=collection
+    )
 
 
 def ffcsv_zip_with_rows(zip_bytes: bytes, edit: Callable[[str], str]) -> bytes:
@@ -66,9 +69,8 @@ def recipes_dir() -> Path:
 
 @pytest.fixture
 def genesis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Callable[[Mapping[str, str | bytes]], respx.Route]:
-    """Isolated Destatis cache plus an env token; the tablefile POST answers each table code with its zip."""
+    """Isolated Destatis cache; the tablefile POST answers each table code with its zip (``run`` passes the token)."""
     monkeypatch.setattr(DestatisReader, "cache_dir", str(tmp_path / "genesis"))
-    monkeypatch.setenv("GENESIS_TOKEN", TOKEN)
 
     def mock(zips: Mapping[str, str | bytes]) -> respx.Route:
         bodies = {

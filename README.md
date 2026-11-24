@@ -50,11 +50,16 @@ result = mloda.run_all(
 Destatis, with a free [GENESIS account](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/docs/credentials.md):
 
 ```python
+import os
+
+from mloda.user import Credential, DataAccessCollection
 from mloda_plugin_govdata.feature_groups.destatis import DestatisReader
 
+genesis = DataAccessCollection(credentials={"genesis": Credential(token=os.environ["GENESIS_TOKEN"])})
 result = mloda.run_all(
     [Feature("value", options={DestatisReader: "12411-0010"})],  # population by Land
     compute_frameworks=["PyArrowTable"],
+    data_access_collection=genesis,
 )
 ```
 
@@ -77,15 +82,16 @@ cd mloda-plugin-govdata
 uv sync --all-extras
 ```
 
-Tutorials, about 15 minutes each:
+Tutorials, about 15 minutes each. Read them online with their results, no install needed: [mloda-ai.github.io/mloda-plugin-govdata](https://mloda-ai.github.io/mloda-plugin-govdata/).
 
 1. [Your first table](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/01_first_table.py): find a GovData dataset, see its columns, read it. No account. `uv run marimo edit tutorials/01_first_table.py`
 2. [Elections and air quality](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/02_elections_and_air_quality.py): read the 2025 Bundestag election results and hourly ozone, steering each reader with options. No account. `uv run marimo edit tutorials/02_elections_and_air_quality.py`
 3. [A table from Destatis](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/03_destatis_table.py): read population by Land from GENESIS-Online, choose years and categories, read the signs that replace numbers. Free GENESIS-Online account, token in `.env`. `uv run marimo edit tutorials/03_destatis_table.py`
 4. [Districts on today's borders](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/04_todays_borders.py): re-base a district's population series across a merger, read how each value came about, add EU region codes (NUTS). Same account as tutorial 3. `uv run marimo edit tutorials/04_todays_borders.py`
 5. [Recipes and provenance](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/05_recipes_and_provenance.py): run a recipe file, join population and eligible voters for all 16 Länder, read where every number came from and under which license. Same account as tutorial 3. `uv run marimo edit tutorials/05_recipes_and_provenance.py`
+6. [A new election](https://github.com/mloda-ai/mloda-plugin-govdata/blob/main/tutorials/06_a_new_election.py): read four Berlin elections with one set of reader options, add the next election as one more URL, compute turnout without the postal vote trap. No account. `uv run marimo edit tutorials/06_a_new_election.py`
 
-Demo: `uv run marimo edit demos/berlin_wahl_2026_demo.py` reads four Berlin elections with one set of reader options.
+Demo: `uv run marimo edit demos/berlin_wahl_2026_demo.py` takes the Berlin elections further: party names, the people living in each voting district, an election night replayed.
 
 ## Docs
 

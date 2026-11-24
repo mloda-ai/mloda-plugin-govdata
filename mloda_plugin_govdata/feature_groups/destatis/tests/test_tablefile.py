@@ -30,7 +30,7 @@ NEVER_SENT = {"area", "stand", "timeslices"}
 
 
 def _client(tmp_path: Path) -> GenesisClient:
-    return GenesisClient(GENESIS_ONLINE, DestatisCredentials(token=TOKEN), lock_dir=tmp_path, environ={})
+    return GenesisClient(GENESIS_ONLINE, DestatisCredentials(token=TOKEN), lock_dir=tmp_path)
 
 
 def test_minimal_selection_sends_only_the_pinned_fields() -> None:

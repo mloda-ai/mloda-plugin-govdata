@@ -1,12 +1,15 @@
 """KreisRebaseFeature: matching, option forwarding, and the expected re-based cells through mloda.run_all."""
 
 import csv
+import dataclasses
+import hashlib
 import json
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pyarrow as pa
 import pytest
 import respx
@@ -25,7 +28,7 @@ from mloda.user import (
 
 from mloda_plugin_govdata.feature_groups.destatis.core.auth import OPTION_GENESIS_CREDENTIALS, DestatisCredentials
 from mloda_plugin_govdata.feature_groups.destatis.reader import DestatisReader
-from mloda_plugin_govdata.feature_groups.govdata.core.cache import CacheMissError
+from mloda_plugin_govdata.feature_groups.govdata.core.cache import CacheMissError, DownloadCache
 from mloda_plugin_govdata.feature_groups.harmonization.core.rebase import (
     Flag,
     KeySheet,
@@ -35,10 +38,19 @@ from mloda_plugin_govdata.feature_groups.harmonization.core.rebase import (
     rebase,
 )
 from mloda_plugin_govdata.feature_groups.harmonization.core.reference.download import SourceIntegrityError
+from mloda_plugin_govdata.feature_groups.harmonization.core.reference.sources import BBSR_KREISE, ReferenceCopy
 from mloda_plugin_govdata.feature_groups.harmonization.rebase import KreisRebaseFeature
 from mloda_plugin_govdata.recipes import Compliance, SourceCompliance, build_recipe, parse_recipe, recipe_to_json
 
-from .conftest import COCHEM_ZELL_ZIP, EXTRACT, GOETTINGEN_LOCATOR, GOETTINGEN_ZIP, LAND_ZIP, ffcsv_zip_with_rows
+from .conftest import (
+    COCHEM_ZELL_ZIP,
+    EXTRACT,
+    GOETTINGEN_LOCATOR,
+    GOETTINGEN_ZIP,
+    LAND_ZIP,
+    ffcsv_zip_with_rows,
+    genesis_collection,
+)
 
 CONFIGURATION_BASED_NAME = "destatis__bevoelkerung__kreise"
 PARTS = KreisRebaseFeature.OUTPUT_PARTS
@@ -59,7 +71,7 @@ def _cells(table: pa.Table, name: str) -> list[tuple[str, int, int, str, str]]:
 
 
 def _run(features: list[Feature | str]) -> Any:
-    return mloda.run_all(features, compute_frameworks=["PyArrowTable"])
+    return mloda.run_all(features, compute_frameworks=["PyArrowTable"], data_access_collection=genesis_collection())
 
 
 # --- Level 1: matching and input features -----------------------------------------------------
@@ -72,6 +84,7 @@ def test_matches_the_chained_and_the_configuration_based_name() -> None:
     assert not KreisRebaseFeature.match_feature_group_criteria("value", years)
     configured = Options(group=YEARS, context={"in_features": "value"})
     assert KreisRebaseFeature.match_feature_group_criteria(CONFIGURATION_BASED_NAME, configured)
+    assert not KreisRebaseFeature.match_feature_group_criteria("value", configured)  # the name is its source column
     assert not KreisRebaseFeature.match_feature_group_criteria(
         CONFIGURATION_BASED_NAME, Options(context={"in_features": "value"})
     )
@@ -268,6 +281,12 @@ def test_two_parts_of_one_output_in_one_request(genesis: Callable[[str], respx.R
     table = _run([Feature("value__rebased~key", options=options), Feature("value__rebased~value", options=options)])[0]
     assert sorted(table.schema.names) == ["value__rebased~key", "value__rebased~value"]
     assert table.num_rows == 5
+    # Each set of options gets its own frame.
+    flagged = {**options, "rebase_on_incomplete": "flag"}
+    result = _run([Feature("value__rebased~flag", options=options), Feature("value__rebased~value", options=flagged)])
+    for name in ("value__rebased~flag", "value__rebased~value"):
+        assert result.frame_for(name).schema.names == [name]
+        assert result.frame_for(name).num_rows == 5
 
 
 @respx.mock
@@ -496,6 +515,7 @@ def test_collection_credentials_reach_the_reader_under_a_derived_feature(
             {"in_features": "value"},
             CARRIES_IN_FEATURES % "value",
         ),
+        ("value", YEARS, {"in_features": "value"}, r"KreisRebaseFeature \(feature name\): 'value' equals its source"),
     ],
 )
 @respx.mock
@@ -522,35 +542,50 @@ def test_a_land_table_is_refused_by_its_variable(genesis: Callable[[str], respx.
         _run([Feature("value__rebased", options={DestatisReader.__name__: locator, **YEARS})])
 
 
-def test_keys_missing_from_the_cache_name_the_fetch_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@respx.mock
+def test_the_key_file_cache_state_in_load_keys_and_reference_sources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(KreisRebaseFeature, "cache_dir", str(tmp_path))
     with pytest.raises(CacheMissError, match="KreisRebaseFeature.fetch_reference\\(\\).*KreisRebaseFeature.cache_dir"):
         KreisRebaseFeature.load_keys()
+    assert KreisRebaseFeature.reference_sources() == [ReferenceCopy(BBSR_KREISE, None, None)]
+
+    # A cached body that is not the pinned one reads as not cached; the pinned one reports its copy.
+    body = b"key sheets"
+    respx.get(BBSR_KREISE.url).mock(return_value=httpx.Response(200, content=body))
+    with DownloadCache(tmp_path) as cache:
+        cache.get_or_download(BBSR_KREISE.url)
+    assert KreisRebaseFeature.reference_sources() == [ReferenceCopy(BBSR_KREISE, None, None)]
+    digest = hashlib.sha256(body).hexdigest()
+    pinned = dataclasses.replace(BBSR_KREISE, sha256=digest)
+    monkeypatch.setattr("mloda_plugin_govdata.feature_groups.harmonization.rebase.BBSR_KREISE", pinned)
+    (copy,) = KreisRebaseFeature.reference_sources()
+    assert (copy.source, copy.sha256) == (pinned, digest)
+    assert copy.retrieved_at is not None
+    assert respx.calls.call_count == 1
 
 
-@pytest.mark.parametrize("cached", [True, False])
-def test_fetch_reference_reads_offline_first_and_fetches_once_on_a_miss(
-    cached: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@respx.mock
+def test_fetch_reference_stores_the_pinned_file_unparsed_and_fetches_it_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    calls: list[bool] = []
-
-    def load(cache: Any, *, revalidate: bool = False) -> list[Any]:
-        calls.append(revalidate)
-        if not (cached or revalidate):
-            raise CacheMissError("miss")
-        return []
-
-    monkeypatch.setattr("mloda_plugin_govdata.feature_groups.harmonization.rebase.load_bbsr_kreise", load)
+    # Not a workbook, so a parse would raise.
+    body = b"key sheets"
+    route = respx.get(BBSR_KREISE.url).mock(return_value=httpx.Response(200, content=body))
+    pinned = dataclasses.replace(BBSR_KREISE, sha256=hashlib.sha256(body).hexdigest())
+    monkeypatch.setattr("mloda_plugin_govdata.feature_groups.harmonization.rebase.BBSR_KREISE", pinned)
     monkeypatch.setattr(KreisRebaseFeature, "cache_dir", str(tmp_path))
     KreisRebaseFeature.fetch_reference()
-    assert calls == ([False] if cached else [False, True])
+    KreisRebaseFeature.fetch_reference()
+    assert route.call_count == 1
+    assert [copy.sha256 for copy in KreisRebaseFeature.reference_sources()] == [pinned.sha256]
 
 
+@respx.mock
 def test_fetch_reference_raises_a_drifted_upstream_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    def load(cache: Any, *, revalidate: bool = False) -> list[Any]:
-        raise SourceIntegrityError("drifted") if revalidate else CacheMissError("miss")
-
-    monkeypatch.setattr("mloda_plugin_govdata.feature_groups.harmonization.rebase.load_bbsr_kreise", load)
+    respx.get(BBSR_KREISE.url).mock(return_value=httpx.Response(200, content=b"drifted"))
     monkeypatch.setattr(KreisRebaseFeature, "cache_dir", str(tmp_path))
-    with pytest.raises(SourceIntegrityError, match="drifted"):
+    with pytest.raises(SourceIntegrityError, match="the upstream file may have changed"):
         KreisRebaseFeature.fetch_reference()
+    assert KreisRebaseFeature.reference_sources() == [ReferenceCopy(BBSR_KREISE, None, None)]

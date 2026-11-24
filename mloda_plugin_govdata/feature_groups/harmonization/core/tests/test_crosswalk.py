@@ -34,6 +34,7 @@ def test_load_nuts_crosswalk_year_range_widens_with_gv_isys_history(
         lambda cache, **kwargs: rows,
     )
     crosswalk = load_nuts_crosswalk(_FakeCache(), gv_isys_changes=changes)  # type: ignore[arg-type]
+    assert min(c.effective_date_legal.year for c in changes) == 2015  # must not widen the range
     assert crosswalk.year_range == (2016, 2024)
     assert crosswalk.gv_isys_changes == tuple(changes)
 

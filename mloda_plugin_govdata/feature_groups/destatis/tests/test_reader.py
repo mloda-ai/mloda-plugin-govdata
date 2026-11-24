@@ -1,4 +1,4 @@
-"""DestatisReader: locator dispatch, peek without credentials, end-to-end via mloda.run_all."""
+"""DestatisReader: locator dispatch, peek without credentials, collection-only credentials, mloda.run_all end to end."""
 
 import inspect
 import json
@@ -35,9 +35,13 @@ def _mock_tablefile(zip_bytes: bytes) -> respx.Route:
     )
 
 
-def _match(value: object) -> SourceMatch:
+def _collection() -> DataAccessCollection:
+    return DataAccessCollection(credentials={"genesis": Credential(token=TOKEN)})
+
+
+def _match(value: object, collection: DataAccessCollection | None = None) -> SourceMatch:
     [match] = DestatisReader.find_sources(
-        DestatisReader.CLAIM_ROUTES[0], "value", Options({DestatisReader.__name__: value}), None
+        DestatisReader.CLAIM_ROUTES[0], "value", Options({DestatisReader.__name__: value}), collection
     )
     return match
 
@@ -63,12 +67,12 @@ def test_destatis_option_never_yields_a_govdata_locator() -> None:
 @respx.mock
 def test_load_data_level2_string_locator(fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(DestatisReader, "cache_dir", str(tmp_path))
-    monkeypatch.setenv("GENESIS_TOKEN", TOKEN)
     zip_bytes = (fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes()
     route = _mock_tablefile(zip_bytes)
     result = mloda.run_all(
         [Feature("value", options={DestatisReader.__name__: TABLE_CODE})],
         compute_frameworks=["PyArrowTable"],
+        data_access_collection=_collection(),
     )
     table = result[0]
     assert table.num_rows == 207
@@ -80,12 +84,12 @@ def test_load_data_level2_string_locator(fixtures_dir: Path, tmp_path: Path, mon
 @respx.mock
 def test_load_data_level2_dict_locator(fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(DestatisReader, "cache_dir", str(tmp_path))
-    monkeypatch.setenv("GENESIS_TOKEN", TOKEN)
     zip_bytes = (fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes()
     _mock_tablefile(zip_bytes)
     result = mloda.run_all(
         [Feature("value", options={DestatisReader.__name__: {"name": TABLE_CODE, "quality": True}})],
         compute_frameworks=["PyArrowTable"],
+        data_access_collection=_collection(),
     )
     assert result[0].num_rows == 207
 
@@ -95,12 +99,12 @@ def test_load_data_level2_class_key_locator(
     fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(DestatisReader, "cache_dir", str(tmp_path))
-    monkeypatch.setenv("GENESIS_TOKEN", TOKEN)
     zip_bytes = (fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes()
     _mock_tablefile(zip_bytes)
     result = mloda.run_all(
         [Feature("value", options=cast(dict[str, Any], {DestatisReader: DestatisLocator(TABLE_CODE)}))],
         compute_frameworks=["PyArrowTable"],
+        data_access_collection=_collection(),
     )
     assert result[0].num_rows == 207
 
@@ -112,10 +116,11 @@ def test_resolves_without_explicit_compute_framework(
     # As in govdata/tests/test_reader.py: the reader must not collide with mloda's own source groups,
     # so run_all with no compute_frameworks pin still resolves to one group.
     monkeypatch.setattr(DestatisReader, "cache_dir", str(tmp_path))
-    monkeypatch.setenv("GENESIS_TOKEN", TOKEN)
     zip_bytes = (fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes()
     _mock_tablefile(zip_bytes)
-    result = mloda.run_all([Feature("value", options={DestatisReader.__name__: TABLE_CODE})])
+    result = mloda.run_all(
+        [Feature("value", options={DestatisReader.__name__: TABLE_CODE})], data_access_collection=_collection()
+    )
     assert len(result[0]) == 207
 
 
@@ -140,17 +145,33 @@ def test_peek_and_fetch_without_credentials_on_a_cache_hit(
     assert payload.provenance.url == GENESIS_ONLINE.url("data/tablefile")
     assert payload.provenance.parameters["name"] == TABLE_CODE
     assert payload.provenance.license == DestatisReader.LICENSE == "DL-DE-BY-2.0"
+    assert DestatisReader.retrieval(TABLE_CODE) == payload
+    # A run with nothing bound serves the cached selection offline too.
+    result = mloda.run_all(
+        [Feature("value", options={DestatisReader.__name__: TABLE_CODE})], compute_frameworks=["PyArrowTable"]
+    )
+    assert result[0].num_rows == 207 and _bound_handles(result) == {None}
     assert respx.calls.call_count == 0
 
 
 @respx.mock
 def test_peek_without_credentials_raises_on_a_cache_miss(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    for var in ("GENESIS_TOKEN", "GENESIS_USER", "GENESIS_PASSWORD"):
-        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("GENESIS_TOKEN", TOKEN)  # never read: only the collection counts
     monkeypatch.setattr(DestatisReader, "cache_dir", str(tmp_path))
     with pytest.raises(Exception, match="No credentials"):
         DestatisReader.peek(TABLE_CODE)
+    assert DestatisReader.retrieval(TABLE_CODE) is None
     assert respx.calls.call_count == 0
+
+
+@respx.mock
+def test_peek_on_a_cache_miss_sends_the_collection_token(
+    fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _env_token_only(monkeypatch, tmp_path)
+    route = _mock_tablefile((fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes())
+    assert DestatisReader.peek(TABLE_CODE, _collection(), options={})["value"] == "double"
+    assert route.calls.last.request.headers["username"] == TOKEN
 
 
 @pytest.mark.parametrize(
@@ -208,18 +229,21 @@ def test_the_retired_credential_option_is_refused_before_any_request(
 
 
 @respx.mock
-def test_another_plugins_token_is_never_sent_to_genesis(
+def test_neither_the_env_nor_another_plugins_token_is_sent_to_genesis(
     fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _env_token_only(monkeypatch, tmp_path)
     route = _mock_tablefile((fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes())
-    result = mloda.run_all(
-        [Feature("value", options={DestatisReader.__name__: TABLE_CODE})],
-        compute_frameworks=["PyArrowTable"],
-        data_access_collection=DataAccessCollection(credentials={"hf": Credential(token=TOKEN)}),
-    )
-    assert route.calls.last.request.headers["username"] == ENV_TOKEN
-    assert _bound_handles(result) == {None}  # env credentials bind no handle
+    foreign = DataAccessCollection(credentials={"hf": Credential(token=TOKEN)})
+    assert DestatisReader.match_credentials(_match(TABLE_CODE, foreign)) is None  # nothing bound
+    with pytest.raises(Exception, match="No credentials for GENESIS-Online") as excinfo:
+        mloda.run_all(
+            [Feature("value", options={DestatisReader.__name__: TABLE_CODE})],
+            compute_frameworks=["PyArrowTable"],
+            data_access_collection=foreign,
+        )
+    assert ENV_TOKEN not in str(excinfo.value) and TOKEN not in str(excinfo.value)
+    assert route.calls.call_count == 0
 
 
 @respx.mock
@@ -295,12 +319,11 @@ def test_unknown_feature_names_available_columns(
     fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(DestatisReader, "cache_dir", str(tmp_path))
-    monkeypatch.setenv("GENESIS_TOKEN", TOKEN)
     zip_bytes = (fixtures_dir / "ffcsv" / FFCSV_FIXTURE).read_bytes()
     _mock_tablefile(zip_bytes)
     features = FeatureSet([Feature("value"), Feature("not_a_column")])
     with pytest.raises(ValueError) as excinfo:
-        DestatisReader.load_neutral(_match(TABLE_CODE), features)
+        DestatisReader.load_neutral(_match(TABLE_CODE, _collection()), features)
     message = str(excinfo.value)
     assert "Unknown feature(s) 'not_a_column'" in message
     assert "value" in message
@@ -311,7 +334,7 @@ _SUBPROCESS_SCRIPT = textwrap.dedent(
     import sys
     import httpx
     import respx
-    from mloda.user import Feature, mloda
+    from mloda.user import Credential, DataAccessCollection, Feature, mloda
 
     fixture_zip, cache_dir = sys.argv[1], sys.argv[2]
 
@@ -337,6 +360,7 @@ _SUBPROCESS_SCRIPT = textwrap.dedent(
         result = mloda.run_all(
             [Feature("value", options={DestatisReader.__name__: "21611-0002"})],
             compute_frameworks=["PyArrowTable"],
+            data_access_collection=DataAccessCollection(credentials={"genesis": Credential(token=sys.argv[3])}),
         )
     table = result[0]
     assert table.num_rows == 207, table.num_rows
@@ -348,12 +372,11 @@ _SUBPROCESS_SCRIPT = textwrap.dedent(
 
 
 def test_registration_in_a_fresh_subprocess_with_only_destatis_imported(
-    fixtures_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    fixtures_dir: Path, tmp_path: Path, no_genesis_env: None
 ) -> None:
-    monkeypatch.setenv("GENESIS_TOKEN", TOKEN)
     zip_path = fixtures_dir / "ffcsv" / FFCSV_FIXTURE
     completed = subprocess.run(
-        [sys.executable, "-c", _SUBPROCESS_SCRIPT, str(zip_path), str(tmp_path)],
+        [sys.executable, "-c", _SUBPROCESS_SCRIPT, str(zip_path), str(tmp_path), TOKEN],
         capture_output=True,
         text=True,
         check=False,

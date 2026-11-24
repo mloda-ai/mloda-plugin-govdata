@@ -31,13 +31,18 @@ location. `AnnualPeriodFeature` inherits the attribute but reads no reference ta
 `HarmonizationFeature.cache_dir` itself, not one subclass's, to move every group's cache at once.
 `KreisRebaseFeature.fetch_reference()` and `AgsToNutsFeature.fetch_reference()` fill it: offline when the
 pinned files are cached, else fetched once; a file that no longer matches its pin raises.
+`reference_sources()` lists each group's files (name, URL, license, attribution) with the cached copy's
+sha256 and download time, offline; both are `None` for a file not in the cache.
 
 ```python
-from mloda.user import Feature, Options, mloda
+import os
+
+from mloda.user import Credential, DataAccessCollection, Feature, Options, mloda
 from mloda_plugin_govdata.feature_groups.destatis import DestatisReader
 from mloda_plugin_govdata.feature_groups.harmonization import KreisRebaseFeature  # registers the groups
 
 KreisRebaseFeature.fetch_reference()  # the BBSR key file: fetched on the first run, read offline afterwards
+genesis = DataAccessCollection(credentials={"genesis": Credential(token=os.environ["GENESIS_TOKEN"])})
 
 goettingen = {
     "name": "12411-0015",
@@ -54,6 +59,7 @@ result = mloda.run_all(
         )
     ],
     compute_frameworks=["PyArrowTable"],
+    data_access_collection=genesis,
 )
 result[0]  # value__rebased~key, ~year, ~value, ~flag, ~sources, ~marker, ~issues, ~provenance
 ```
@@ -88,6 +94,10 @@ Feature(
 - A configuration-based name (`destatis__bevoelkerung__kreise`, or plain `kreise`) whose options select no
   group (the rebase years missing or misspelled, say) fails while features resolve, before any fetch: every
   reader declines a name carrying `in_features` and says so in the error.
+- A configuration-based name must differ from its source column (`kreise`, not `value`, over `in_features="value"`);
+  one equal to it fails while features resolve, before any fetch.
+- A name takes one set of options per run. `__nuts2024` and `__year_period` refuse a second set by name;
+  `__rebased` returns one frame per set.
 - mloda returns one frame per FeatureGroup, so a reader column requested next to a harmonized feature lands
   in its own frame.
 
@@ -142,7 +152,8 @@ Maps AGS keys through the pinned Eurostat LAU-to-NUTS crosswalk
 (or the `nuts_version` option) and must be the cached crosswalk's. Kreis keys retired before the
 crosswalk's Gebietsstand resolve through the GV-ISys change files named in `AgsToNutsFeature.history_years`
 (the pinned year); Land keys are out of scope. `AgsToNutsFeature.fetch_reference()` fetches the crosswalk
-and the change files once.
+and the change files once, without parsing them; a change file for a year without a pin is first checked
+when a run reads it.
 
 | Option | Meaning |
 | --- | --- |

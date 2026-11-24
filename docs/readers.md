@@ -48,7 +48,7 @@ with build_client() as client:
 StuttgartPopulationReader.peek(slug)  # {"Stichtag": "date32[day]", "Stadtbezirk": "string", ...}
 ```
 
-It works on every reader (`BundeswahlleiterinReader.peek(kerg)`, `UbaAirReader.peek(uba_measures_url(...))`, `DestatisReader.peek(...)`) and downloads through the cache, so the actual feature request reuses the file. `peek` takes a raw URL, bypassing the `PROPERTY_MAPPING` validation. `describe_columns` returns the same columns with mloda `DataType`s, the form lineage extenders read. A typo in a feature name fails with the available columns and a close-match suggestion.
+It works on every reader (`BundeswahlleiterinReader.peek(kerg)`, `UbaAirReader.peek(uba_measures_url(...))`, `DestatisReader.peek(..., collection)`) and downloads through the cache, so the actual feature request reuses the file. `peek(value, options=...)` takes the reader options a feature would carry, such as a file layout, and validates them the same way. `peek` takes a raw URL, so UBA's query options do not apply there. `describe_columns` returns the same columns with mloda `DataType`s, the form lineage extenders read; it reads with the reader's default options. A typo in a feature name fails with the available columns and a close-match suggestion. `retrieval` takes the same values and returns the cached copy's record (`retrieved_at`, `sha256`, `provenance`) offline, `None` when it is not cached; a CKAN dataset id needs its distribution URL there, and the provenance names the URL, not the CKAN record.
 
 ## Elections (Bundeswahlleiterin)
 
@@ -66,7 +66,7 @@ result = mloda.run_all(
 
 Column names are the header rows joined by spaces (`Wahlberechtigte Zweitstimmen Endgültig`). The layout is set per feature by options whose defaults fit `kerg.csv`: `OPTION_WAHL_SKIPROWS` (preamble lines, 5), `OPTION_WAHL_HEADER_ROWS` (3), `OPTION_WAHL_LABEL_COLUMNS` (leading text columns, 4), and `OPTION_WAHL_VALUE_TYPE` (type of the rest, `ColumnType.INTEGER`). An empty value cell becomes null, not 0.
 
-`OPTION_WAHL_TEXT_COLUMNS` names further columns read as text wherever they sit. The long-format `kerg2.csv` ends with two text columns, so it reads with `OPTION_WAHL_SKIPROWS: 9`, `OPTION_WAHL_HEADER_ROWS: 1`, `OPTION_WAHL_LABEL_COLUMNS: 11`, `OPTION_WAHL_VALUE_TYPE: ColumnType.FLOAT` and `OPTION_WAHL_TEXT_COLUMNS: ["Bemerkung", "Gewählt"]`. In `Gewählt`, the dash `–` is text, not a value marker (a winner without a seat).
+`OPTION_WAHL_TEXT_COLUMNS` names further columns read as text wherever they sit. The long-format `kerg2.csv` ends with two text columns, so it reads with `OPTION_WAHL_SKIPROWS: 9`, `OPTION_WAHL_HEADER_ROWS: 1`, `OPTION_WAHL_LABEL_COLUMNS: 11`, `OPTION_WAHL_VALUE_TYPE: ColumnType.FLOAT` and `OPTION_WAHL_TEXT_COLUMNS: ["Bemerkung", "Gewählt"]`; pass the same dict to `BundeswahlleiterinReader.peek(kerg2, options=...)` to list its columns. In `Gewählt`, the dash `–` is text, not a value marker (a winner without a seat).
 
 ## Air quality (UBA)
 
@@ -106,11 +106,16 @@ Columns are `station_id`, `date_start`, `component_id`, `scope_id`, `value`, `da
 Reads a GENESIS table (GENESIS-Online or a Regionalstatistik installation) by table code and parses the ffcsv reply. Needs a free registration, see [credentials.md](credentials.md).
 
 ```python
+import os
+
+from mloda.user import Credential, DataAccessCollection
 from mloda_plugin_govdata.feature_groups.destatis import DestatisReader
 
+genesis = DataAccessCollection(credentials={"genesis": Credential(token=os.environ["GENESIS_TOKEN"])})
 result = mloda.run_all(
     [Feature("value", options={DestatisReader: "12411-0010"})],  # population by Land
     compute_frameworks=["PyArrowTable"],
+    data_access_collection=genesis,
 )
 ```
 
