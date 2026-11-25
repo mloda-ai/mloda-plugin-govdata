@@ -56,7 +56,7 @@ git merge template/main
 **Triggers:**
 - Manual dispatch only, with an optional `publish` tick box
 
-**Purpose:** Runs every tutorial against the live sources. With `publish`, it then builds one web page per tutorial plus an index (`scripts/build_site.py`) and deploys them to GitHub Pages. A cell that fails or stops, or a credential in a page, fails the run and publishes nothing.
+**Purpose:** Runs every tutorial against the live sources. With `publish`, it then builds one web page per tutorial plus an index (`scripts/build_site.py`) and deploys them to GitHub Pages. The pages load marimo's viewer from a copy in the site, with marimo's license and third-party notices, not from a CDN. A cell that fails or stops, a page still linking the viewer on the CDN, missing viewer files, or a credential in a page, fails the run and publishes nothing.
 
 **To publish:** **Actions** > **Tutorials (live)** > **Run workflow**, on the default branch, with `publish` ticked. The pages appear at `https://<owner>.github.io/mloda-plugin-govdata/`. From another branch the pages are not deployed: they stay an artifact of the run for one day, to look at first.
 

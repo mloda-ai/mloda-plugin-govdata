@@ -4,7 +4,10 @@ Usage:
     uv run --env-file .env python scripts/build_site.py --out site
 
 Every tutorial runs against the live sources, so this needs network access and ``GENESIS_TOKEN``.
-A cell that fails or stops, or a credential in a page, removes ``--out`` again.
+The pages load marimo's viewer from a copy in the site, not from a CDN. Some outputs (plotly, maps) still make the
+viewer fetch from other hosts at runtime; a test keeps the libraries behind them out of the tutorials.
+A cell that fails or stops, a page still linking the viewer on the CDN, missing viewer files, or a credential in a
+page, removes ``--out`` again.
 """
 
 from __future__ import annotations
@@ -14,6 +17,7 @@ import ast
 import base64
 import binascii
 import html
+import importlib.metadata
 import re
 import shutil
 
@@ -23,6 +27,7 @@ import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NamedTuple
 
 from mloda_plugin_govdata.feature_groups.destatis import GENESIS_ONLINE, DestatisCredentials, MissingCredentialsError
 from mloda_plugin_govdata.recipes.credential_scan import environment_secrets
@@ -31,6 +36,14 @@ TUTORIALS_DIR = Path(__file__).resolve().parents[1] / "tutorials"
 REPO_URL = "https://github.com/mloda-ai/mloda-plugin-govdata"
 # marimo's command line, with a stopped cell counted as a failed one.
 _MARIMO = Path(__file__).with_name("export_page.py")
+# Where marimo's export links its viewer; the build points those links at the copy in the site instead.
+_MARIMO_CDN = "cdn.jsdelivr.net"
+_VIEWER_LINK = re.compile(r"""(?:src|href)=["']https?://""" + re.escape(_MARIMO_CDN))
+# Site folder for the copy, and the files a page links at the top of marimo's static folder (not its own start page).
+_VIEWER = "marimo"
+_VIEWER_TOP_LEVEL = (".ico", ".png", ".json", ".webmanifest")
+# Shipped next to the viewer with marimo's license: its bundled packages and their license texts.
+_THIRD_PARTY = ("third_party.txt", "third_party_licenses.txt")
 _BASE64_PAYLOAD = re.compile(r";base64,([A-Za-z0-9+/]+=*)")
 _LINK = '<a href="{href}" style="color:inherit;text-decoration:underline"{lang}>{label}</a>'
 _BETWEEN = '<span aria-hidden="true"> | </span>'
@@ -51,6 +64,29 @@ def export(notebook: Path, page: Path) -> int:
     """Run the notebook and write it as one static page; non-zero when a cell failed or stopped."""
     command = [sys.executable, str(_MARIMO), "export", "html", str(notebook), "-o", str(page), "-f"]
     return subprocess.run(command, check=False).returncode  # nosec B603
+
+
+class _Viewer(NamedTuple):
+    prefix: str  # what marimo's export writes before every viewer file
+    static: Path
+    notices: dict[str, Path]  # name in the site -> file in the installed marimo
+
+
+def _viewer_source() -> _Viewer | str:
+    """The installed marimo's viewer, or why it cannot be shipped."""
+    marimo = importlib.metadata.distribution("marimo")
+    package = Path(str(marimo.locate_file("marimo")))
+    # In the dist-info folder, whichever layout; the package also bundles other projects' LICENSE files.
+    licenses = [file for file in marimo.files or () if file.name == "LICENSE" and file.parts[0].endswith(".dist-info")]
+    notices = {name: package / name for name in _THIRD_PARTY}
+    if licenses:
+        notices["LICENSE.txt"] = Path(str(marimo.locate_file(licenses[0])))
+    missing = [name for name in ("LICENSE.txt", *_THIRD_PARTY) if not notices.get(name, Path()).is_file()]
+    if missing:
+        return f"the installed marimo lacks {', '.join(missing)} to ship with its viewer"
+    # As marimo's get_default_asset_url writes the version.
+    version = marimo.version.replace(".dev", "-dev")
+    return _Viewer(f"https://{_MARIMO_CDN}/npm/@marimo-team/frontend@{version}/dist/", package / "_static", notices)
 
 
 def _leaks(text: str, secrets: set[str], nested: int = 2) -> bool:
@@ -96,8 +132,9 @@ def _index(entries: Sequence[tuple[str, str]]) -> str:
 <p>These pages are a snapshot from {built}. The inputs on them do not react: to change a value, run the
 notebooks yourself, see the <a href="{REPO_URL}#tutorials-and-demos">README</a>
 (<span lang="de">auf Deutsch: <a href="{REPO_URL}/blob/main/docs/schnellstart.md">Schnellstart</a></span>).</p>
-<p>Each tutorial ends with the source and the license of its data. The tutorial pages load their viewer,
-marimo, from the jsDelivr network.</p>
+<p>Each tutorial ends with the source and the license of its data. The tutorial pages use marimo's viewer, served
+from this site (<a href="{_VIEWER}/LICENSE.txt">license</a>; <a href="{_VIEWER}/third_party.txt">bundled packages</a>
+and <a href="{_VIEWER}/third_party_licenses.txt">their licenses</a>).</p>
 <p>Funded by the German Federal Ministry of Research, Technology and Space (BMFTR) through the
 <a href="https://prototypefund.de">Prototype Fund</a>, supported by the
 <a href="https://okfn.de">Open Knowledge Foundation Deutschland</a>. Funding code: 16IS26S11.</p>
@@ -112,6 +149,11 @@ def build(tutorials: Path, out: Path, secrets: set[str]) -> str | None:
     notebooks = sorted(path for path in tutorials.glob("*.py") if not path.name.startswith("_"))
     if not notebooks:
         return f"no tutorials in {tutorials}"
+    viewer = _viewer_source()
+    if isinstance(viewer, str):
+        return viewer
+    # Only links: a notebook may mention the CDN in its text.
+    rewrite = re.compile(r"""((?:src|href)=["'])""" + re.escape(viewer.prefix))
     entries: list[tuple[str, str]] = []
     for notebook in notebooks:
         line = _first_docstring_line(notebook)
@@ -120,16 +162,27 @@ def build(tutorials: Path, out: Path, secrets: set[str]) -> str | None:
         page = f"{notebook.stem}.html"
         if export(notebook, out / page) != 0:
             return f"{notebook.name} did not run to the end"
+        text = rewrite.sub(lambda link: f"{link.group(1)}{_VIEWER}/", (out / page).read_text(encoding="utf-8"))
+        if _VIEWER_LINK.search(text):
+            return f"{page} still links {_MARIMO_CDN}"
         # The last </body>: notebook code or an output may hold the tag as text.
-        head, body_end, tail = (out / page).read_text(encoding="utf-8").rpartition("</body>")
+        head, body_end, tail = text.rpartition("</body>")
         if not body_end:
             return f"{page} has no </body> to put the legal links before"
         (out / page).write_text(head + _BAR + body_end + tail, encoding="utf-8")
         entries.append((page, line))
+    shutil.copytree(viewer.static / "assets", out / _VIEWER / "assets")
+    for file in viewer.static.iterdir():
+        if file.is_file() and file.suffix in _VIEWER_TOP_LEVEL:
+            shutil.copyfile(file, out / _VIEWER / file.name)
+    for name, notice in viewer.notices.items():
+        shutil.copyfile(notice, out / _VIEWER / name)
     (out / "index.html").write_text(_index(entries), encoding="utf-8")
-    for written in sorted(out.iterdir()):
-        if _leaks(written.read_text(encoding="utf-8", errors="replace"), secrets):
-            return f"{written.name} contains a GENESIS credential"  # the file, never the value
+    # The viewer folder is a copy of the installed package, not output of a notebook run.
+    written = (path for path in out.rglob("*") if path.is_file() and path.relative_to(out).parts[0] != _VIEWER)
+    for file in sorted(written):
+        if _leaks(file.read_text(encoding="utf-8", errors="replace"), secrets):
+            return f"{file.relative_to(out)} contains a GENESIS credential"  # the file, never the value
     return None
 
 
