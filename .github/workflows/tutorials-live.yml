@@ -7,13 +7,20 @@ on:
         description: Publish the tutorials as web pages (GitHub Pages)
         type: boolean
         default: false
+      runner:
+        description: Where the tutorials run; self-hosted for a source that blocks GitHub's runners
+        type: choice
+        options: [github-hosted, self-hosted]
+        default: github-hosted
 
 permissions:
   contents: read
 
 jobs:
   tutorials:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'self-hosted' && fromJSON('["self-hosted", "govdata-tutorials"]') || 'ubuntu-latest' }}
+    # The self-hosted runner is a maintainer's machine: the job waits for approval there.
+    environment: ${{ inputs.runner == 'self-hosted' && 'self-hosted-runner' || '' }}
     timeout-minutes: 30
 
     steps:

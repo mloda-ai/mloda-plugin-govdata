@@ -373,7 +373,15 @@ def test_the_workflow_publishes_by_hand_only_and_after_the_live_test() -> None:
     assert set(workflow[True]) == {"workflow_dispatch"}  # YAML 1.1 reads the key `on` as true
     tick_box = workflow[True]["workflow_dispatch"]["inputs"]["publish"]
     assert (tick_box["type"], tick_box["default"]) == ("boolean", False)
-    steps = workflow["jobs"]["tutorials"]["steps"]
+    runner = workflow[True]["workflow_dispatch"]["inputs"]["runner"]
+    assert (runner["type"], runner["default"]) == ("choice", "github-hosted")
+    tutorials = workflow["jobs"]["tutorials"]
+    # One condition picks both the self-hosted runner and the environment that holds the job for approval.
+    self_hosted = "inputs.runner == 'self-hosted'"
+    assert tutorials["runs-on"].startswith("${{ " + self_hosted + " && ")
+    assert tutorials["environment"] == "${{ " + self_hosted + " && 'self-hosted-runner' || '' }}"
+    assert workflow["jobs"]["publish"]["runs-on"] == "ubuntu-latest"
+    steps = tutorials["steps"]
     runs = [step.get("run", "") for step in steps]
     live = next(position for position, run in enumerate(runs) if "pytest -m live" in run)
     build = next(position for position, run in enumerate(runs) if "scripts/build_site.py" in run)
