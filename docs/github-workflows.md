@@ -54,7 +54,7 @@ git merge template/main
 **File:** `.github/workflows/tutorials-live.yml`
 
 **Triggers:**
-- Manual dispatch only, with an optional `publish` tick box
+- Manual dispatch only, with an optional `publish` tick box and a `runner` choice
 
 **Purpose:** Runs every tutorial against the live sources. With `publish`, it then builds one web page per tutorial plus an index (`scripts/build_site.py`) and deploys them to GitHub Pages. The pages load marimo's viewer from a copy in the site, with marimo's license and third-party notices, not from a CDN. A cell that fails or stops, a page still linking the viewer on the CDN, missing viewer files, or a credential in a page, fails the run and publishes nothing.
 
@@ -63,6 +63,8 @@ git merge template/main
 **Requirements:**
 - `GENESIS_TOKEN` - a GENESIS-Online token, as a repository secret (on a fork: the fork's own secret)
 - For `publish`: **Settings** > **Pages** > **Source** set to **GitHub Actions**; this creates the `github-pages` environment the deploy uses
+
+**Self-hosted:** if a source refuses GitHub's runners, pick `runner: self-hosted`. The `tutorials` job then runs on a runner labelled `govdata-tutorials` and waits in the `self-hosted-runner` environment until a reviewer approves; the deploy stays on GitHub. Keep fork pull request workflows on "Require approval for all external contributors", give the environment a required reviewer and the `main` branch only, and register the runner with `--ephemeral` just before the run, so it takes this one job and leaves.
 
 ## Release Workflow
 
